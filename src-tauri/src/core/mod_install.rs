@@ -133,6 +133,8 @@ fn record_install_inner(
                 file_name = excluded.file_name,
                 sha256 = excluded.sha256,
                 source_type = excluded.source_type,
+                update_available = 0,
+                latest_version_id = NULL,
                 dependency_of = excluded.dependency_of",
             params![
                 instance.id,

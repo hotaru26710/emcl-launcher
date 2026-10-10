@@ -98,11 +98,19 @@ pub async fn check_mod_updates(
             .map_err(|error| error.to_string())?;
         (instance, installed)
     };
+    let installed_ids = installed
+        .iter()
+        .map(|item| item.mod_id.clone())
+        .collect::<Vec<_>>();
     let updates = crate::core::mod_update::check_updates(&state.http, &instance, installed, config)
         .await
         .map_err(|error| error.to_string())?;
     {
         let connection = state.db.lock().map_err(|error| error.to_string())?;
+        for mod_id in installed_ids {
+            mod_install::set_update(&connection, &instance.id, &mod_id, None)
+                .map_err(|error| error.to_string())?;
+        }
         for update in &updates {
             mod_install::set_update(
                 &connection,
