@@ -1,3 +1,4 @@
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 
@@ -8,6 +9,8 @@ use serde_json::{json, Value};
 use tokio::fs;
 use tokio::process::Command;
 use walkdir::WalkDir;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::core::install::{self, ArtifactDownload, ArtifactDownloadRequest, ProgressReporter};
 use crate::core::paths::{is_safe_segment, LauncherPaths};
@@ -305,6 +308,16 @@ async fn install_installer_loader(
     )
     .await?;
 
+    let patched_installer = tokio::task::spawn_blocking({
+        let source = installer_path.clone();
+        let destination = installer_path.with_file_name("installer-emcl.jar");
+        move || patch_installer_mirrors(&source, &destination)
+    })
+    .await
+    .ok()
+    .and_then(Result::ok)
+    .unwrap_or_else(|| installer_path.clone());
+
     let mut last_error = String::new();
     let mut installed = false;
     for arguments in [
@@ -317,7 +330,7 @@ async fn install_installer_loader(
         let mut installer_command = Command::new(java_path);
         installer_command
             .arg("-jar")
-            .arg(&installer_path)
+            .arg(&patched_installer)
             .args(&arguments)
             .current_dir(&install_root)
             .stdout(Stdio::piped())
@@ -715,6 +728,74 @@ fn merge_value(base: &mut Value, incoming: Value) {
             *base_value = incoming_value;
         }
     }
+}
+
+fn patch_installer_mirrors(source: &Path, destination: &Path) -> Result<PathBuf> {
+    let source_file = std::fs::File::open(source)
+        .with_context(|| format!("无法打开 installer {}", source.display()))?;
+    let mut archive = ZipArchive::new(source_file)?;
+    let destination_file = std::fs::File::create(destination)
+        .with_context(|| format!("无法创建临时 installer {}", destination.display()))?;
+    let mut writer = ZipWriter::new(destination_file);
+
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)?;
+        let Some(enclosed) = entry.enclosed_name() else {
+            continue;
+        };
+        if entry.is_dir() {
+            continue;
+        }
+        let entry_name = enclosed.to_string_lossy().replace('\\', "/");
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes)?;
+
+        if entry_name == "install_profile.json" || entry_name == "version.json" {
+            if let Ok(mut value) = serde_json::from_slice::<Value>(&bytes) {
+                rewrite_mirror_urls(&mut value);
+                bytes = serde_json::to_vec(&value)?;
+            }
+        }
+
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        writer.start_file(entry_name, options)?;
+        writer.write_all(&bytes)?;
+    }
+    writer.finish()?;
+    Ok(destination.to_path_buf())
+}
+
+fn rewrite_mirror_urls(value: &mut Value) {
+    match value {
+        Value::String(text) => {
+            *text = mirror_maven_url(text);
+        }
+        Value::Array(values) => {
+            for value in values {
+                rewrite_mirror_urls(value);
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values_mut() {
+                rewrite_mirror_urls(value);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn mirror_maven_url(url: &str) -> String {
+    let bmcl = "https://bmclapi2.bangbang93.com/maven/";
+    for prefix in [
+        "https://maven.neoforged.net/releases/",
+        "https://maven.minecraftforge.net/",
+        "https://libraries.minecraft.net/",
+    ] {
+        if let Some(rest) = url.strip_prefix(prefix) {
+            return format!("{bmcl}{rest}");
+        }
+    }
+    url.to_string()
 }
 
 async fn get_json(client: &Client, url: &str) -> Result<Value> {
