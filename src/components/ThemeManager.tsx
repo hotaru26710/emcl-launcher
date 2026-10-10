@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { CustomThemeColors, ThemeMode } from "../api/types";
 import { useLauncherStore } from "../stores/launcher";
 
@@ -76,6 +76,14 @@ function parseCustom(json: string | null | undefined): Partial<CustomThemeColors
 
 export function ThemeManager() {
   const settings = useLauncherStore((state) => state.settings);
+  const [systemTick, setSystemTick] = useState(0);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const listener = () => setSystemTick((value) => value + 1);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -111,7 +119,7 @@ export function ThemeManager() {
     root.style.setProperty("--theme-muted", colors.muted);
     root.style.setProperty("--theme-border", colors.border);
     root.style.setProperty("--theme-control", colors.control);
-  }, [settings?.theme, settings?.customTheme]);
+  }, [settings?.theme, settings?.customTheme, systemTick]);
 
   return null;
 }

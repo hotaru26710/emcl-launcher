@@ -260,33 +260,23 @@ html[data-theme="custom"] .app-shell {
   color: var(--theme-text);
 }
 
-html[data-theme="light"] .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300),
-html[data-theme="pink"] .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300),
-html[data-theme="custom"] .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300) {
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300) {
   color: var(--theme-text-strong) !important;
 }
 
-html[data-theme="light"] .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700),
-html[data-theme="pink"] .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700),
-html[data-theme="custom"] .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700) {
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700) {
   color: var(--theme-muted) !important;
 }
 
-html[data-theme="light"] .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]),
-html[data-theme="pink"] .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]),
-html[data-theme="custom"] .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]) {
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]) {
   background-color: var(--theme-control) !important;
 }
 
-html[data-theme="light"] .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]),
-html[data-theme="pink"] .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]),
-html[data-theme="custom"] .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]) {
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]) {
   border-color: var(--theme-border) !important;
 }
 
-html[data-theme="light"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300),
-html[data-theme="pink"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300),
-html[data-theme="custom"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300) {
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300) {
   background-color: var(--theme-accent) !important;
 }
 
@@ -295,8 +285,109 @@ html[data-theme="custom"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cya
   color: var(--theme-text);
 }
 
-html[data-theme="light"] .app-header :is(.text-slate-500, .text-slate-600),
-html[data-theme="pink"] .app-header :is(.text-slate-500, .text-slate-600),
-html[data-theme="custom"] .app-header :is(.text-slate-500, .text-slate-600) {
+html[data-theme]:not([data-theme="dark"]) .app-header :is(.text-slate-500, .text-slate-600) {
   color: var(--theme-muted) !important;
+}
+
+
+/* Comprehensive theme overrides for non-dark presets. */
+html[data-theme]:not([data-theme="dark"]) .app-shell {
+  color: var(--theme-text);
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="text-white"],
+  [class*="text-slate-100"],
+  [class*="text-slate-200"],
+  [class*="text-slate-300"]
+) {
+  color: var(--theme-text-strong) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="text-slate-400"],
+  [class*="text-slate-500"],
+  [class*="text-slate-600"],
+  [class*="text-slate-700"]
+) {
+  color: var(--theme-muted) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/"],
+  [class*="bg-[#040914]"]
+) {
+  background-color: var(--theme-control) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="border-white"],
+  [class*="border-slate"]
+) {
+  border-color: var(--theme-border) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  input,
+  textarea,
+  select
+) {
+  color: var(--theme-text) !important;
+  background-color: var(--theme-control) !important;
+  border-color: var(--theme-border) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(input, textarea)::placeholder {
+  color: var(--theme-muted) !important;
+  opacity: 0.72;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="text-cyan-100"],
+  [class*="text-cyan-200"],
+  [class*="text-cyan-300"],
+  [class*="text-cyan-400"]
+) {
+  color: var(--theme-accent) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="border-cyan-"],
+  [class*="border-blue-"]
+) {
+  border-color: color-mix(in srgb, var(--theme-accent) 28%, transparent) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="bg-cyan-"],
+  [class*="bg-blue-"],
+  [class*="bg-fuchsia-"],
+  [class*="bg-purple-"],
+  [class*="bg-emerald-"]
+) {
+  background-color: color-mix(in srgb, var(--theme-accent) 14%, transparent) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="from-cyan-"],
+  [class*="from-blue-"],
+  [class*="from-fuchsia-"],
+  [class*="from-purple-"],
+  [class*="from-emerald-"]
+) {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--theme-accent) 20%, transparent),
+    color-mix(in srgb, var(--theme-accent) 6%, transparent)
+  ) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell :is(
+  [class*="bg-amber-"],
+  [class*="bg-rose-"]
+) {
+  background-color: color-mix(in srgb, var(--theme-text-strong) 8%, transparent) !important;
 }

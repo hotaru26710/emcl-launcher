@@ -75,6 +75,15 @@ export function SettingsPage() {
     setFullscreen(settings.fullscreen);
   }, [settings]);
 
+  const applyTheme = (nextTheme: ThemeMode, nextCustom = customTheme) => {
+    setTheme(nextTheme);
+    setCustomTheme(nextCustom);
+    void saveSettings({
+      theme: nextTheme,
+      customTheme: JSON.stringify(nextCustom),
+    });
+  };
+
   const save = async () => {
     setSaved(false);
     try {
@@ -116,7 +125,7 @@ export function SettingsPage() {
               <button
                 key={preset.id}
                 type="button"
-                onClick={() => setTheme(preset.id)}
+                onClick={() => applyTheme(preset.id)}
                 className={[
                   "rounded-2xl border p-3 text-left transition",
                   theme === preset.id ? "border-cyan-300/30 bg-cyan-300/[0.08]" : "border-white/8 bg-slate-950/30 hover:border-white/15",
@@ -147,7 +156,10 @@ export function SettingsPage() {
                     <input
                       type="color"
                       value={customTheme[key]}
-                      onChange={(event) => setCustomTheme((current) => ({ ...current, [key]: event.currentTarget.value }))}
+                      onChange={(event) => {
+                        const next = { ...customTheme, [key]: event.currentTarget.value };
+                        applyTheme("custom", next);
+                      }}
                       className="h-8 w-10 rounded border-0 bg-transparent p-0"
                     />
                     <span className="font-mono text-[10px] text-slate-500">{customTheme[key]}</span>
