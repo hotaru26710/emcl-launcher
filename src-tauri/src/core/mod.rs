@@ -11,6 +11,7 @@ pub mod instance;
 pub mod java;
 pub mod launch;
 pub mod loader;
+pub mod mcim;
 pub mod metadata;
 pub mod mods;
 pub mod paths;

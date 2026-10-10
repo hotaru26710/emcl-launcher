@@ -390,16 +390,32 @@ async fn install_mod_file(
     file: &ModrinthFile,
     reporter: &ProgressReporter,
 ) -> Result<bool> {
-    if !file.filename.to_ascii_lowercase().ends_with(".jar") {
-        bail!("社区模组文件不是 .jar: {}", file.filename);
-    }
-    let destination = safe_mod_path(
-        &PathBuf::from(&instance.directory).join("mods"),
+    install_mod_url_file(
+        client,
+        instance,
+        &file.url,
         &file.filename,
-    )?;
-    if install::artifact_file_is_valid(&destination, file.hashes.sha1.as_deref(), Some(file.size))
-        .await?
-    {
+        file.hashes.sha1.as_deref(),
+        Some(file.size),
+        reporter,
+    )
+    .await
+}
+
+pub(crate) async fn install_mod_url_file(
+    client: &Client,
+    instance: &Instance,
+    url: &str,
+    filename: &str,
+    sha1: Option<&str>,
+    size: Option<u64>,
+    reporter: &ProgressReporter,
+) -> Result<bool> {
+    if !filename.to_ascii_lowercase().ends_with(".jar") {
+        bail!("社区模组文件不是 .jar: {filename}");
+    }
+    let destination = safe_mod_path(&PathBuf::from(&instance.directory).join("mods"), filename)?;
+    if install::artifact_file_is_valid(&destination, sha1, size).await? {
         return Ok(true);
     }
     install::download_artifacts(ArtifactDownloadRequest {
@@ -410,11 +426,11 @@ async fn install_mod_file(
         stage: "community-mod",
         message: "正在下载社区模组",
         artifacts: vec![ArtifactDownload {
-            url: file.url.clone(),
+            url: url.to_string(),
             destination,
-            sha1: file.hashes.sha1.clone(),
-            size: Some(file.size),
-            label: file.filename.clone(),
+            sha1: sha1.map(ToString::to_string),
+            size,
+            label: filename.to_string(),
             version_id: instance.version_id.clone(),
         }],
         reporter,

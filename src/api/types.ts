@@ -252,6 +252,44 @@ export interface CommunityInstallResult {
   mods: ModInfo[];
 }
 
+export interface McimCurseForgeSearchResult {
+  id: number;
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  iconUrl?: string | null;
+  downloads: number;
+  author: string;
+  categories: string[];
+}
+
+export interface McimCurseForgeFile {
+  id: number;
+  modId: number;
+  displayName: string;
+  fileName: string;
+  fileDate: string;
+  fileLength: number;
+  downloadUrl?: string | null;
+  gameVersions: string[];
+  releaseType: number;
+  sha1?: string | null;
+}
+
+export interface SearchMcimInput {
+  query: string;
+  gameVersion: string;
+  loader?: string | null;
+  offset?: number | null;
+}
+
+export interface InstallMcimInput {
+  instanceId: string;
+  modId: number;
+  fileId: number;
+}
+
 export interface GitHubRepository {
   id: number;
   fullName: string;

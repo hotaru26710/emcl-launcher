@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/tauri";
-import type { CommunityInstallResult, GitHubAsset, GitHubRelease, GitHubRepository, Instance, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
+import type { CommunityInstallResult, GitHubAsset, GitHubRelease, GitHubRepository, Instance, McimCurseForgeFile, McimCurseForgeSearchResult, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
@@ -71,6 +71,12 @@ export function CommunityMods() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
+  const [mcimQuery, setMcimQuery] = useState("");
+  const [mcimResults, setMcimResults] = useState<McimCurseForgeSearchResult[]>([]);
+  const [selectedMcim, setSelectedMcim] = useState<McimCurseForgeSearchResult | null>(null);
+  const [mcimFiles, setMcimFiles] = useState<McimCurseForgeFile[]>([]);
+  const [mcimLoading, setMcimLoading] = useState(false);
+  const [mcimFilesLoading, setMcimFilesLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -197,6 +203,50 @@ export function CommunityMods() {
     try {
       const mods = await api.installGitHubReleaseAsset(instance.id, asset);
       setMessage(`已安装 ${asset.name}，当前实例模组数：${mods.length}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const searchMcim = async () => {
+    if (!instance) return;
+    setMcimLoading(true);
+    setSelectedMcim(null);
+    setMcimFiles([]);
+    setMessage("");
+    try {
+      setMcimResults(await api.searchMcimCurseForgeMods({ query: mcimQuery, gameVersion: instance.versionId, loader: instance.loader, offset: 0 }));
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setMcimLoading(false);
+    }
+  };
+
+  const selectMcim = async (project: McimCurseForgeSearchResult) => {
+    if (!instance) return;
+    setSelectedMcim(project);
+    setMcimFilesLoading(true);
+    setMessage("");
+    try {
+      setMcimFiles(await api.getMcimCurseForgeFiles(project.id, instance.versionId, instance.loader));
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setMcimFilesLoading(false);
+    }
+  };
+
+  const installMcim = async (file: McimCurseForgeFile) => {
+    if (!instance) return;
+    if (!window.confirm("将从 MCIM 下载并安装此 CurseForge 文件，必需依赖会自动处理。是否继续？")) return;
+    setInstalling(`mcim-${file.id}`);
+    setMessage("");
+    try {
+      const result = await api.installMcimCurseForgeFile({ instanceId: instance.id, modId: file.modId, fileId: file.id });
+      setMessage(`MCIM 安装完成：新增 ${result.installed} 个，跳过 ${result.skipped} 个。`);
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -499,6 +549,66 @@ export function CommunityMods() {
           </section>
         </div>
       ) : null}
+
+      <section className="glass-panel mt-5 rounded-[30px] p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-slate-200">MCIM CurseForge</h2>
+            <p className="mt-1 text-xs text-slate-600">无需 CurseForge API Key，使用 MCIM 镜像搜索与下载；edge.forgecdn.net 会自动重写到镜像域名。</p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={mcimQuery}
+              onChange={(event) => setMcimQuery(event.currentTarget.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") void searchMcim(); }}
+              placeholder="搜索 CurseForge 模组"
+              className="w-64 rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
+            />
+            <button type="button" disabled={mcimLoading} onClick={() => void searchMcim()} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950 disabled:opacity-40">
+              {mcimLoading ? "加载中" : "搜索 MCIM"}
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
+            {mcimResults.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">输入关键词后搜索 MCIM CurseForge。</div>
+            ) : mcimResults.map((project) => (
+              <button key={project.id} type="button" onClick={() => void selectMcim(project)} className={[
+                "flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition",
+                selectedMcim?.id === project.id ? "border-cyan-300/30 bg-cyan-300/[0.08]" : "border-white/8 bg-slate-950/30",
+              ].join(" ")}>
+                {project.iconUrl ? <img src={project.iconUrl} alt="" className="h-11 w-11 rounded-2xl object-cover" /> : <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-800"><Box size={17} /></div>}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-slate-100">{project.title}</div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{project.description}</p>
+                  <div className="mt-1 text-[10px] text-slate-600">{compactNumber(project.downloads)} 下载 · {project.author}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
+            {!selectedMcim ? (
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">先选择一个 MCIM 项目。</div>
+            ) : mcimFilesLoading ? (
+              <div className="py-10 text-center text-sm text-slate-500">正在读取文件...</div>
+            ) : mcimFiles.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">没有兼容文件。</div>
+            ) : mcimFiles.map((file) => (
+              <div key={file.id} className="rounded-2xl border border-white/8 bg-slate-950/30 p-3">
+                <div className="text-sm font-medium text-slate-100">{file.displayName}</div>
+                <div className="mt-1 text-xs text-slate-600">{file.fileName} · {formatDate(file.fileDate)}</div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <a href={`https://www.curseforge.com/minecraft/mc-mods/${selectedMcim.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300">访问官方页 <ExternalLink size={12} /></a>
+                  <button type="button" disabled={installing === `mcim-${file.id}`} onClick={() => void installMcim(file)} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950 disabled:opacity-40">
+                    {installing === `mcim-${file.id}` ? "安装中" : "安装到实例"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

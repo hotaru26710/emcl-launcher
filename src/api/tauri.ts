@@ -6,6 +6,10 @@ import type {
   CommunityInstallResult,
   ConflictFinding,
   CrashAnalysis,
+  SearchMcimInput,
+  McimCurseForgeSearchResult,
+  McimCurseForgeFile,
+  InstallMcimInput,
   GitHubRepository,
   GitHubRelease,
   GitHubAsset,
@@ -144,6 +148,12 @@ export const api = {
     invoke<GitHubRelease[]>("get_github_releases", { owner, repo }),
   installGitHubReleaseAsset: (instanceId: string, asset: GitHubAsset) =>
     invoke<ModInfo[]>("install_github_release_asset", { instanceId, asset }),
+  searchMcimCurseForgeMods: (input: SearchMcimInput) =>
+    invoke<McimCurseForgeSearchResult[]>("search_mcim_curseforge_mods", { input }),
+  getMcimCurseForgeFiles: (modId: number, gameVersion: string, loader?: string | null) =>
+    invoke<McimCurseForgeFile[]>("get_mcim_curseforge_files", { modId, gameVersion, loader }),
+  installMcimCurseForgeFile: (input: InstallMcimInput) =>
+    invoke<CommunityInstallResult>("install_mcim_curseforge_file", { input }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),
