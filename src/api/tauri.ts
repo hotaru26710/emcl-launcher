@@ -4,9 +4,11 @@ import type {
   AccountSummary,
   CreateInstanceInput,
   DeviceCodeResponse,
+  InstallLoaderInput,
   InstallProgress,
   InstallSummary,
   InstallVersionInput,
+  LoaderInstallResult,
   Instance,
   JavaInstallation,
   JavaRecommendation,
@@ -57,6 +59,8 @@ export const api = {
     invoke<AccountSummary>("refresh_microsoft_account", { id }),
   installVersion: (input: InstallVersionInput) =>
     invoke<InstallSummary>("install_version", { input }),
+  installLoader: (input: InstallLoaderInput) =>
+    invoke<LoaderInstallResult>("install_loader", { input }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),

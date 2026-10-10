@@ -110,7 +110,9 @@ pub struct DownloadArtifact {
 #[serde(rename_all = "camelCase")]
 pub struct Library {
     pub name: String,
+    #[serde(default)]
     pub downloads: LibraryDownloads,
+    pub url: Option<String>,
     pub natives: Option<HashMap<String, String>>,
     pub rules: Option<Vec<Rule>>,
     pub extract: Option<LibraryExtract>,

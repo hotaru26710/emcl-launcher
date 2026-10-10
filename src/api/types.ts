@@ -99,6 +99,21 @@ export interface Settings {
   dataDirectory: string;
 }
 
+export type LoaderType = "fabric" | "quilt" | "neoforge" | "forge";
+
+export interface LoaderInstallResult {
+  versionId: string;
+  loader: LoaderType;
+  loaderVersion: string;
+  profilePath: string;
+}
+
+export interface InstallLoaderInput {
+  instanceId: string;
+  loader: LoaderType;
+  loaderVersion?: string | null;
+}
+
 export interface AccountSummary {
   id: string;
   username: string;

@@ -5,6 +5,7 @@ import type {
   CreateInstanceInput,
   InstallProgress,
   Instance,
+  LoaderType,
   JavaInstallation,
   LaunchLog,
   Settings,
@@ -49,6 +50,7 @@ interface LauncherStore {
   setActiveAccount: (id: string) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   startInstall: (versionId: string, instanceId?: string | null) => Promise<void>;
+  installLoader: (instanceId: string, loader: LoaderType, loaderVersion?: string | null) => Promise<void>;
   startInstance: (instanceId: string) => Promise<void>;
   stopInstance: (instanceId: string) => Promise<void>;
   appendLaunchLog: (log: LaunchLog) => void;
@@ -295,6 +297,16 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
           } as InstallProgress,
         },
       }));
+      throw error;
+    }
+  },
+
+  installLoader: async (instanceId, loader, loaderVersion = null) => {
+    try {
+      await api.installLoader({ instanceId, loader, loaderVersion });
+      await get().refreshInstances();
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
       throw error;
     }
   },

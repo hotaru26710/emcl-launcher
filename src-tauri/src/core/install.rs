@@ -191,6 +191,16 @@ struct DownloadRuntime<'a> {
     reporter: &'a ProgressReporter,
 }
 
+#[derive(Debug, Clone)]
+pub struct ArtifactDownload {
+    pub url: String,
+    pub destination: PathBuf,
+    pub sha1: Option<String>,
+    pub size: Option<u64>,
+    pub label: String,
+    pub version_id: String,
+}
+
 #[derive(Clone)]
 struct DownloadItem {
     url: String,
@@ -879,6 +889,49 @@ impl DownloadItem {
             version_id,
         })
     }
+}
+
+pub struct ArtifactDownloadRequest<'a> {
+    pub client: &'a Client,
+    pub mirror: &'a str,
+    pub concurrency: u32,
+    pub force_redownload: bool,
+    pub stage: &'a str,
+    pub message: &'a str,
+    pub artifacts: Vec<ArtifactDownload>,
+    pub reporter: &'a ProgressReporter,
+}
+
+pub async fn download_artifacts(request: ArtifactDownloadRequest<'_>) -> Result<()> {
+    let ArtifactDownloadRequest {
+        client,
+        mirror,
+        concurrency,
+        force_redownload,
+        stage,
+        message,
+        artifacts,
+        reporter,
+    } = request;
+    let items = artifacts
+        .into_iter()
+        .map(|artifact| DownloadItem {
+            url: artifact.url,
+            destination: artifact.destination,
+            sha1: artifact.sha1,
+            size: artifact.size,
+            label: artifact.label,
+            version_id: artifact.version_id,
+        })
+        .collect();
+    let runtime = DownloadRuntime {
+        client,
+        mirror,
+        concurrency,
+        force_redownload,
+        reporter,
+    };
+    download_many(&runtime, stage, message, items).await
 }
 
 #[cfg(test)]

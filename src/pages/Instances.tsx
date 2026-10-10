@@ -14,6 +14,7 @@ import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate, versionTypeLabel } from "../lib/format";
+import type { LoaderType } from "../api/types";
 import { useLauncherStore } from "../stores/launcher";
 
 export function Instances() {
@@ -22,11 +23,15 @@ export function Instances() {
   const loading = useLauncherStore((state) => state.loadingInstances);
   const createInstance = useLauncherStore((state) => state.createInstance);
   const deleteInstance = useLauncherStore((state) => state.deleteInstance);
+  const startInstall = useLauncherStore((state) => state.startInstall);
+  const installLoader = useLauncherStore((state) => state.installLoader);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [versionId, setVersionId] = useState("1.21.1");
   const [memoryMb, setMemoryMb] = useState(4096);
+  const [loader, setLoader] = useState<"vanilla" | LoaderType>("vanilla");
+  const [loaderVersion, setLoaderVersion] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -39,7 +44,18 @@ export function Instances() {
     if (!name.trim()) return;
     setSubmitting(true);
     try {
-      await createInstance({ name: name.trim(), versionId, memoryMb });
+      const created = await createInstance({
+        name: name.trim(),
+        versionId,
+        memoryMb,
+        loader: loader === "vanilla" ? null : loader,
+        loaderVersion: loader === "vanilla" || !loaderVersion.trim() ? null : loaderVersion.trim(),
+      });
+      if (loader === "vanilla") {
+        await startInstall(created.versionId, created.id);
+      } else {
+        await installLoader(created.id, loader, loaderVersion.trim() || null);
+      }
       setName("");
       setMemoryMb(4096);
       setDialogOpen(false);
@@ -192,6 +208,33 @@ export function Instances() {
                   ))}
                 </select>
               </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-400">加载器</span>
+                  <select
+                    value={loader}
+                    onChange={(event) => setLoader(event.currentTarget.value as "vanilla" | LoaderType)}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40"
+                  >
+                    <option value="vanilla">Vanilla</option>
+                    <option value="fabric">Fabric</option>
+                    <option value="quilt">Quilt</option>
+                    <option value="neoforge">NeoForge</option>
+                    <option value="forge">Forge</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-400">加载器版本</span>
+                  <input
+                    value={loaderVersion}
+                    disabled={loader === "vanilla"}
+                    onChange={(event) => setLoaderVersion(event.currentTarget.value)}
+                    placeholder={loader === "vanilla" ? "不需要" : "留空自动选择"}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40 disabled:opacity-35"
+                  />
+                </label>
+              </div>
 
               <label className="block">
                 <span className="flex items-center gap-2 text-xs font-medium text-slate-400">

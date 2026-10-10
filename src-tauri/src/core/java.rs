@@ -13,6 +13,7 @@ use tokio::process::Command;
 use walkdir::WalkDir;
 
 use crate::core::version::VersionDetails;
+use crate::db::models::{Instance, Settings};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -284,6 +285,32 @@ pub fn parse_major_version(version: &str) -> Option<u32> {
 
 fn normalize_path(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+pub async fn resolve_java_path(
+    instance: &Instance,
+    settings: &Settings,
+    details: &VersionDetails,
+) -> Result<PathBuf> {
+    for candidate in [
+        instance.java_path.as_deref(),
+        settings.default_java_path.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let path = PathBuf::from(candidate);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    let installations = detect_java_installations().await?;
+    let recommendation = recommend_java(&installations, details);
+    recommendation
+        .installation
+        .map(|installation| PathBuf::from(installation.path))
+        .ok_or_else(|| anyhow::anyhow!(recommendation.reason))
 }
 
 #[cfg(test)]
