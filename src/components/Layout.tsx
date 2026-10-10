@@ -5,7 +5,7 @@ import { WindowControls } from "./WindowControls";
 
 export function Layout() {
   return (
-    <div className="h-screen w-screen p-2.5">
+    <div className="h-screen w-screen p-0">
       <div className="relative flex h-full overflow-hidden rounded-[30px] border border-white/[0.09] app-shell shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="animate-drift absolute -right-24 -top-28 h-96 w-96 rounded-full bg-cyan-400/[0.075] blur-3xl" />

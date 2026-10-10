@@ -74,6 +74,42 @@ function parseCustom(json: string | null | undefined): Partial<CustomThemeColors
   }
 }
 
+export function applyTheme(mode: ThemeMode, customThemeJson?: string | null) {
+  const root = document.documentElement;
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const resolved = mode === "system" ? (systemDark ? "dark" : "light") : mode;
+
+  let colors: CustomThemeColors & { panelSoft: string; border: string; control: string };
+  if (resolved === "custom") {
+    const custom = parseCustom(customThemeJson);
+    colors = {
+      accent: custom.accent ?? presets.dark.accent,
+      background: custom.background ?? presets.dark.background,
+      panel: custom.panel ?? presets.dark.panel,
+      panelSoft: custom.panel ?? presets.dark.panelSoft,
+      text: custom.text ?? presets.dark.text,
+      muted: custom.muted ?? presets.dark.muted,
+      border: "rgba(127, 127, 127, 0.22)",
+      control: custom.panel ?? presets.dark.control,
+    };
+    root.dataset.theme = "custom";
+  } else {
+    colors = presets[resolved as keyof typeof presets] ?? presets.dark;
+    root.dataset.theme = resolved;
+  }
+
+  root.style.colorScheme = resolved === "light" || resolved === "pink" ? "light" : "dark";
+  root.style.setProperty("--theme-accent", colors.accent);
+  root.style.setProperty("--theme-bg", colors.background);
+  root.style.setProperty("--theme-panel", colors.panel);
+  root.style.setProperty("--theme-panel-soft", colors.panelSoft);
+  root.style.setProperty("--theme-text", colors.text);
+  root.style.setProperty("--theme-text-strong", colors.text);
+  root.style.setProperty("--theme-muted", colors.muted);
+  root.style.setProperty("--theme-border", colors.border);
+  root.style.setProperty("--theme-control", colors.control);
+}
+
 export function ThemeManager() {
   const settings = useLauncherStore((state) => state.settings);
   const [systemTick, setSystemTick] = useState(0);
@@ -86,39 +122,7 @@ export function ThemeManager() {
   }, []);
 
   useEffect(() => {
-    const root = document.documentElement;
-    const mode = settings?.theme ?? "system";
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const resolved = mode === "system" ? (systemDark ? "dark" : "light") : mode;
-
-    let colors: CustomThemeColors & { panelSoft: string; border: string; control: string };
-    if (resolved === "custom") {
-      const custom = parseCustom(settings?.customTheme);
-      colors = {
-        accent: custom.accent ?? presets.dark.accent,
-        background: custom.background ?? presets.dark.background,
-        panel: custom.panel ?? presets.dark.panel,
-        panelSoft: custom.panel ?? presets.dark.panelSoft,
-        text: custom.text ?? presets.dark.text,
-        muted: custom.muted ?? presets.dark.muted,
-        border: "rgba(127, 127, 127, 0.22)",
-        control: custom.panel ?? presets.dark.control,
-      };
-      root.dataset.theme = "custom";
-    } else {
-      colors = presets[resolved as keyof typeof presets] ?? presets.dark;
-      root.dataset.theme = resolved;
-    }
-
-    root.style.setProperty("--theme-accent", colors.accent);
-    root.style.setProperty("--theme-bg", colors.background);
-    root.style.setProperty("--theme-panel", colors.panel);
-    root.style.setProperty("--theme-panel-soft", colors.panelSoft);
-    root.style.setProperty("--theme-text", colors.text);
-    root.style.setProperty("--theme-text-strong", colors.text);
-    root.style.setProperty("--theme-muted", colors.muted);
-    root.style.setProperty("--theme-border", colors.border);
-    root.style.setProperty("--theme-control", colors.control);
+    applyTheme(settings?.theme ?? "system", settings?.customTheme);
   }, [settings?.theme, settings?.customTheme, systemTick]);
 
   return null;

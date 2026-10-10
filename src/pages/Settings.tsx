@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { CustomThemeColors, ThemeMode } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
+import { applyTheme } from "../components/ThemeManager";
 import { useLauncherStore } from "../stores/launcher";
 
 const themePresets: Array<{ id: ThemeMode; label: string; colors: string[] }> = [
@@ -75,12 +76,14 @@ export function SettingsPage() {
     setFullscreen(settings.fullscreen);
   }, [settings]);
 
-  const applyTheme = (nextTheme: ThemeMode, nextCustom = customTheme) => {
+  const previewTheme = (nextTheme: ThemeMode, nextCustom = customTheme) => {
     setTheme(nextTheme);
     setCustomTheme(nextCustom);
+    const json = JSON.stringify(nextCustom);
+    applyTheme(nextTheme, json);
     void saveSettings({
       theme: nextTheme,
-      customTheme: JSON.stringify(nextCustom),
+      customTheme: json,
     });
   };
 
@@ -125,7 +128,7 @@ export function SettingsPage() {
               <button
                 key={preset.id}
                 type="button"
-                onClick={() => applyTheme(preset.id)}
+                onClick={() => previewTheme(preset.id)}
                 className={[
                   "rounded-2xl border p-3 text-left transition",
                   theme === preset.id ? "border-cyan-300/30 bg-cyan-300/[0.08]" : "border-white/8 bg-slate-950/30 hover:border-white/15",
@@ -158,7 +161,7 @@ export function SettingsPage() {
                       value={customTheme[key]}
                       onChange={(event) => {
                         const next = { ...customTheme, [key]: event.currentTarget.value };
-                        applyTheme("custom", next);
+                        previewTheme("custom", next);
                       }}
                       className="h-8 w-10 rounded border-0 bg-transparent p-0"
                     />
