@@ -8,6 +8,7 @@ use serde_json::json;
 
 use crate::core::conflict::ConflictFinding;
 use crate::core::install::{self, ArtifactDownload, ArtifactDownloadRequest, ProgressReporter};
+use crate::core::mcim;
 use crate::core::mods::{self, ModInfo};
 use crate::core::paths::LauncherPaths;
 use crate::db::models::Instance;
@@ -249,18 +250,47 @@ pub async fn repair_missing_dependencies(
     targets.sort();
     targets.dedup();
 
+    reporter.stage(
+        "dependency-repair",
+        "正在查找缺失的必需依赖",
+        targets.len() as u64,
+        0,
+    );
     let mut result = DependencyRepairResult::default();
     for target in targets {
+        reporter.set_message(&format!("正在查找并安装依赖 {target}"));
         match find_and_install_dependency(client, paths, instance, reporter, &target).await {
             Ok(project_title) => result.installed.push(project_title),
-            Err(error) => result.failed.push(format!("{target}: {error}")),
+            Err(error) => result.failed.push(format!("{target}: {error:#}")),
         }
+        reporter.complete_file(&format!("已处理依赖 {target}"));
     }
 
     Ok(result)
 }
 
 async fn find_and_install_dependency(
+    client: &Client,
+    paths: &LauncherPaths,
+    instance: &Instance,
+    reporter: &ProgressReporter,
+    target: &str,
+) -> Result<String> {
+    let modrinth_error =
+        match install_modrinth_dependency(client, paths, instance, reporter, target).await {
+            Ok(title) => return Ok(title),
+            Err(error) => error,
+        };
+
+    match install_mcim_dependency(client, instance, reporter, target).await {
+        Ok(title) => Ok(title),
+        Err(mcim_error) => {
+            bail!("Modrinth 未能补全（{modrinth_error:#}）；MCIM 镜像也未能补全（{mcim_error:#}）")
+        }
+    }
+}
+
+async fn install_modrinth_dependency(
     client: &Client,
     paths: &LauncherPaths,
     instance: &Instance,
@@ -284,11 +314,14 @@ async fn find_and_install_dependency(
         let project = results
             .into_iter()
             .find(|project| {
-                normalize_mod_id(&project.slug) == normalized
-                    || normalize_mod_id(&project.title) == normalized
-                    || normalize_mod_id(&project.project_id) == normalized
+                dependency_project_matches(
+                    &normalized,
+                    &project.slug,
+                    &project.title,
+                    &project.project_id,
+                )
             })
-            .with_context(|| format!("Modrinth 没有找到匹配项目：{target}"))?;
+            .with_context(|| format!("Modrinth 没有找到精确匹配项目：{target}"))?;
         ModrinthProject {
             id: project.project_id,
             title: project.title,
@@ -306,6 +339,59 @@ async fn find_and_install_dependency(
         .with_context(|| format!("Modrinth 项目 {} 没有兼容版本", project.title))?;
     install_modrinth_version(client, paths, instance, &version.id, reporter).await?;
     Ok(project.title)
+}
+
+async fn install_mcim_dependency(
+    client: &Client,
+    instance: &Instance,
+    reporter: &ProgressReporter,
+    target: &str,
+) -> Result<String> {
+    let normalized = normalize_mod_id(target);
+    let projects = mcim::search_curseforge(
+        client,
+        target,
+        &instance.version_id,
+        instance.loader.as_deref(),
+        0,
+    )
+    .await?;
+    let project = projects
+        .into_iter()
+        .find(|project| {
+            dependency_project_matches(
+                &normalized,
+                &project.slug,
+                &project.title,
+                &project.project_id,
+            )
+        })
+        .with_context(|| format!("MCIM 没有找到精确匹配项目：{target}"))?;
+    let files = mcim::get_curseforge_files(
+        client,
+        project.id,
+        &instance.version_id,
+        instance.loader.as_deref(),
+    )
+    .await?;
+    let file = files
+        .into_iter()
+        .find(|file| file.file_name.to_ascii_lowercase().ends_with(".jar"))
+        .with_context(|| {
+            format!(
+                "MCIM 项目 {} 没有适用于当前游戏版本和加载器的 jar",
+                project.title
+            )
+        })?;
+    mcim::install_curseforge_file(client, instance, project.id, file.id, reporter).await?;
+    Ok(project.title)
+}
+
+fn dependency_project_matches(normalized_target: &str, slug: &str, title: &str, id: &str) -> bool {
+    !normalized_target.is_empty()
+        && [slug, title, id]
+            .iter()
+            .any(|candidate| normalize_mod_id(candidate) == normalized_target)
 }
 
 fn normalize_mod_id(value: &str) -> String {
@@ -551,5 +637,34 @@ mod tests {
             .files
             .iter()
             .any(|file| file.filename.ends_with(".jar")));
+    }
+}
+
+#[cfg(test)]
+mod dependency_resolution_tests {
+    use super::dependency_project_matches;
+
+    #[test]
+    fn dependency_lookup_accepts_normalized_exact_slug_or_title() {
+        assert!(dependency_project_matches(
+            "lithostitched",
+            "Litho-Stitched",
+            "Lithostitched",
+            "XaDC71GB"
+        ));
+        assert!(dependency_project_matches(
+            "tectonic", "tectonic", "Tectonic", "lWDHr9jE"
+        ));
+    }
+
+    #[test]
+    fn dependency_lookup_does_not_select_unrelated_search_hits() {
+        assert!(!dependency_project_matches(
+            "tectonic",
+            "tectonic-addon",
+            "Tectonic Addon",
+            "unrelated"
+        ));
+        assert!(!dependency_project_matches("", "", "", ""));
     }
 }

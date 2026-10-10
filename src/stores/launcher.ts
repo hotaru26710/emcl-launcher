@@ -3,6 +3,7 @@ import { api, errorMessage } from "../api/tauri";
 import type {
   AccountSummary,
   CreateInstanceInput,
+  DependencyRepairResult,
   InstallProgress,
   Instance,
   LoaderType,
@@ -50,12 +51,14 @@ interface LauncherStore {
   setActiveAccount: (id: string) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   startInstall: (versionId: string, instanceId?: string | null) => Promise<void>;
+  repairInstanceDependencies: (instanceId: string) => Promise<DependencyRepairResult>;
   installLoader: (instanceId: string, loader: LoaderType, loaderVersion?: string | null) => Promise<void>;
   startInstance: (instanceId: string) => Promise<void>;
   stopInstance: (instanceId: string) => Promise<void>;
   appendLaunchLog: (log: LaunchLog) => void;
   setInstanceRunning: (instanceId: string, running: boolean) => void;
   setInstallProgress: (progress: InstallProgress) => void;
+  removeInstallProgress: (jobId: string) => void;
   clearActiveInstall: () => void;
   clearError: () => void;
 }
@@ -301,6 +304,59 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
     }
   },
 
+  repairInstanceDependencies: async (instanceId) => {
+    const jobId = crypto.randomUUID();
+    const instance = get().instances.find((item) => item.id === instanceId);
+    set((state) => ({
+      activeInstall: { jobId, versionId: instance?.versionId ?? "", instanceId },
+      installProgress: {
+        ...state.installProgress,
+        [jobId]: {
+          jobId,
+          versionId: instance?.versionId ?? "",
+          status: "running",
+          stage: "dependency-repair",
+          message: "正在查找缺失的必需依赖",
+          completedFiles: 0,
+          totalFiles: 0,
+          downloadedBytes: 0,
+          totalBytes: 0,
+          percent: 0,
+        },
+      },
+      lastError: null,
+    }));
+
+    try {
+      const result = await api.repairInstanceDependencies(instanceId, jobId);
+      await get().refreshInstances().catch(() => undefined);
+      return result;
+    } catch (error) {
+      const message = errorMessage(error);
+      set((state) => ({
+        lastError: message,
+        installProgress: {
+          ...state.installProgress,
+          [jobId]: {
+            ...(state.installProgress[jobId] ?? {
+              jobId,
+              versionId: instance?.versionId ?? "",
+              completedFiles: 0,
+              totalFiles: 0,
+              downloadedBytes: 0,
+              totalBytes: 0,
+            }),
+            status: "error",
+            stage: "error",
+            message,
+            percent: state.installProgress[jobId]?.percent ?? 0,
+          } as InstallProgress,
+        },
+      }));
+      throw error;
+    }
+  },
+
   installLoader: async (instanceId, loader, loaderVersion = null) => {
     const jobId = crypto.randomUUID();
     const instance = get().instances.find((item) => item.id === instanceId);
@@ -412,7 +468,22 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
       },
       lastError: progress.status === "error" ? progress.message : state.lastError,
     }));
+    if (progress.status !== "running") {
+      window.setTimeout(() => {
+        get().removeInstallProgress(progress.jobId);
+      }, 5000);
+    }
   },
+
+  removeInstallProgress: (jobId) =>
+    set((state) => {
+      const installProgress = { ...state.installProgress };
+      delete installProgress[jobId];
+      return {
+        installProgress,
+        activeInstall: state.activeInstall?.jobId === jobId ? null : state.activeInstall,
+      };
+    }),
 
   clearActiveInstall: () => set({ activeInstall: null }),
   clearError: () => set({ lastError: null }),

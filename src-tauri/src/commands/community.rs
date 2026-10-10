@@ -91,6 +91,7 @@ pub async fn repair_instance_dependencies(
     app: AppHandle,
     state: State<'_, AppState>,
     instance_id: String,
+    job_id: String,
 ) -> Result<community::DependencyRepairResult, String> {
     let (instance, findings) = {
         let connection = state.db.lock().map_err(|error| error.to_string())?;
@@ -103,13 +104,13 @@ pub async fn repair_instance_dependencies(
         (instance, findings)
     };
 
-    let job_id = format!("dependency-repair-{}", Uuid::new_v4());
     let event_handle = app.clone();
     let sink: install::ProgressSink = Arc::new(move |progress| {
         let _ = event_handle.emit("install-progress", progress);
     });
     let reporter = ProgressReporter::new(job_id, instance.version_id.clone(), sink);
-    let mut result = community::repair_missing_dependencies(
+    reporter.stage("dependency-repair", "正在查找缺失的必需依赖", 0, 0);
+    let mut result = match community::repair_missing_dependencies(
         &state.http,
         &state.paths,
         &instance,
@@ -117,11 +118,22 @@ pub async fn repair_instance_dependencies(
         &reporter,
     )
     .await
-    .map_err(|error| error.to_string())?;
+    {
+        Ok(result) => result,
+        Err(error) => {
+            reporter.fail(&error.to_string());
+            return Err(error.to_string());
+        }
+    };
 
     let connection = state.db.lock().map_err(|error| error.to_string())?;
     result.remaining =
         crate::core::conflict::check_instance_conflicts(&connection, &instance, None)
             .map_err(|error| error.to_string())?;
+    reporter.finish(if result.failed.is_empty() {
+        "依赖补全完成"
+    } else {
+        "依赖补全完成，部分依赖未能安装"
+    });
     Ok(result)
 }

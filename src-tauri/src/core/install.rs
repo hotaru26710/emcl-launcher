@@ -94,6 +94,11 @@ impl ProgressReporter {
         self.emit(true);
     }
 
+    pub fn set_message(&self, message: &str) {
+        *self.lock_string(&self.inner.message) = message.to_string();
+        self.emit(true);
+    }
+
     pub fn start_file(&self, label: &str) {
         *self.lock_string(&self.inner.message) = format!("正在下载 {label}");
         self.emit(true);

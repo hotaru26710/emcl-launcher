@@ -6,6 +6,7 @@ import type { ConflictReport as ConflictReportType } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
+import { useLauncherStore } from "../stores/launcher";
 
 export function ConflictReport() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ export function ConflictReport() {
   const [loading, setLoading] = useState(false);
   const [repairing, setRepairing] = useState(false);
   const [message, setMessage] = useState("");
+  const repairDependencies = useLauncherStore((state) => state.repairInstanceDependencies);
 
   const refresh = async () => {
     if (!id) return;
@@ -32,11 +34,11 @@ export function ConflictReport() {
 
   const repair = async () => {
     if (!id) return;
-    if (!window.confirm("将从 Modrinth 查找并安装缺失的必需依赖，已存在的文件会跳过。是否继续？")) return;
+    if (!window.confirm("将从 Modrinth 或 MCIM 镜像查找并安装缺失的必需依赖，已存在的文件会跳过。是否继续？")) return;
     setRepairing(true);
     setMessage("");
     try {
-      const result = await api.repairInstanceDependencies(id);
+      const result = await repairDependencies(id);
       const installed = result.installed.length ? `已补全：${result.installed.join("、")}` : "没有自动安装新依赖";
       const failed = result.failed.length ? `；未解决：${result.failed.join("；")}` : "";
       setMessage(`${installed}${failed}`);

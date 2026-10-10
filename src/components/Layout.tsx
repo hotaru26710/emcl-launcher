@@ -1,6 +1,5 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
-import { InstallProgressDock } from "./InstallProgressDock";
 import { WindowControls } from "./WindowControls";
 
 export function Layout() {
@@ -35,7 +34,6 @@ export function Layout() {
           </div>
         </main>
       </div>
-      <InstallProgressDock />
     </div>
   );
 }

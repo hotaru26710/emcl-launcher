@@ -7,6 +7,7 @@ import {
   Waves,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { InstallProgressDock } from "./InstallProgressDock";
 
 const navigation = [
   { to: "/instances", label: "实例", hint: "INSTANCES", icon: Gamepad2 },
@@ -73,7 +74,9 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-auto max-h-0 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-transparent opacity-0 transition-all duration-300 group-hover/sidebar:max-h-40 group-hover/sidebar:p-4 group-hover/sidebar:opacity-100">
+        <InstallProgressDock />
+
+        <div className="mt-2 max-h-0 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-transparent opacity-0 transition-all duration-300 group-hover/sidebar:max-h-40 group-hover/sidebar:p-4 group-hover/sidebar:opacity-100">
           <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
             <span className="animate-soft-pulse h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
             本地模式
@@ -81,9 +84,6 @@ export function Sidebar() {
           <p className="mt-2 text-[11px] leading-5 text-slate-600">
             账户、实例与下载记录都留在本机。
           </p>
-          <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-950/70">
-            <div className="progress-sheen h-full w-2/3 rounded-full bg-gradient-to-r from-emerald-400/70 to-cyan-300/70" />
-          </div>
         </div>
       </div>
     </aside>

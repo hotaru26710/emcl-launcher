@@ -8,7 +8,6 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import type { VersionSummary } from "../api/types";
-import { InstallProgressCard } from "../components/ProgressBar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate, versionTypeLabel } from "../lib/format";
@@ -71,12 +70,6 @@ export function Versions() {
           </button>
         }
       />
-
-      {activeProgress ? (
-        <div className="mb-5">
-          <InstallProgressCard progress={activeProgress} />
-        </div>
-      ) : null}
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         {[

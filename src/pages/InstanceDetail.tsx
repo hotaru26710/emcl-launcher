@@ -21,7 +21,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api } from "../api/tauri";
 import type { CrashAnalysis, Instance, JavaRecommendation, ModInfo } from "../api/types";
-import { InstallProgressCard } from "../components/ProgressBar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
@@ -297,12 +296,6 @@ export function InstanceDetail() {
           </div>
         }
       />
-
-      {progress ? (
-        <div className="mb-6">
-          <InstallProgressCard progress={progress} />
-        </div>
-      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="glass-panel hover-lift rounded-[28px] p-5">
