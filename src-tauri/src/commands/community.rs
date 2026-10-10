@@ -85,3 +85,43 @@ pub async fn install_modrinth_version(
         message
     })
 }
+
+#[tauri::command]
+pub async fn repair_instance_dependencies(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<community::DependencyRepairResult, String> {
+    let (instance, findings) = {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        let instance = instance_core::get_instance(&connection, &instance_id)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "实例不存在".to_string())?;
+        let findings =
+            crate::core::conflict::check_instance_conflicts(&connection, &instance, None)
+                .map_err(|error| error.to_string())?;
+        (instance, findings)
+    };
+
+    let job_id = format!("dependency-repair-{}", Uuid::new_v4());
+    let event_handle = app.clone();
+    let sink: install::ProgressSink = Arc::new(move |progress| {
+        let _ = event_handle.emit("install-progress", progress);
+    });
+    let reporter = ProgressReporter::new(job_id, instance.version_id.clone(), sink);
+    let mut result = community::repair_missing_dependencies(
+        &state.http,
+        &state.paths,
+        &instance,
+        &findings,
+        &reporter,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    result.remaining =
+        crate::core::conflict::check_instance_conflicts(&connection, &instance, None)
+            .map_err(|error| error.to_string())?;
+    Ok(result)
+}

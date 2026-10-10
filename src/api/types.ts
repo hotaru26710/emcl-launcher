@@ -28,6 +28,12 @@ export interface CrashAnalysis {
   suggestion: string;
 }
 
+export interface DependencyRepairResult {
+  installed: string[];
+  failed: string[];
+  remaining: ConflictFinding[];
+}
+
 export interface ConflictReport {
   id: number;
   instanceId: string;

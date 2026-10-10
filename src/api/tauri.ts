@@ -6,6 +6,7 @@ import type {
   CommunityInstallResult,
   ConflictFinding,
   CrashAnalysis,
+  DependencyRepairResult,
   ConflictReport,
   CreateInstanceInput,
   CreateProjectInput,
@@ -98,6 +99,8 @@ export const api = {
     invoke<ConflictFinding[]>("check_instance_conflicts", { instanceId, artifactId }),
   listConflictReports: (instanceId: string) =>
     invoke<ConflictReport[]>("list_conflict_reports", { instanceId }),
+  repairInstanceDependencies: (instanceId: string) =>
+    invoke<DependencyRepairResult>("repair_instance_dependencies", { instanceId }),
   refreshInstanceModMetadata: (instanceId: string) =>
     invoke<ModMetadata[]>("refresh_instance_mod_metadata", { instanceId }),
   startProjectWatcher: (projectId: string) =>

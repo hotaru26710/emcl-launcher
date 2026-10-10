@@ -6,6 +6,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::core::conflict::ConflictFinding;
 use crate::core::install::{self, ArtifactDownload, ArtifactDownloadRequest, ProgressReporter};
 use crate::core::mods::{self, ModInfo};
 use crate::core::paths::LauncherPaths;
@@ -26,6 +27,14 @@ pub struct ModrinthSearchResult {
     pub author: String,
     pub categories: Vec<String>,
     pub versions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DependencyRepairResult {
+    pub installed: Vec<String>,
+    pub failed: Vec<String>,
+    pub remaining: Vec<ConflictFinding>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -217,6 +226,78 @@ pub async fn install_modrinth_version(
     .await?;
     result.mods = mods::list_mods(paths, instance)?;
     Ok(result)
+}
+
+pub async fn repair_missing_dependencies(
+    client: &Client,
+    paths: &LauncherPaths,
+    instance: &Instance,
+    findings: &[ConflictFinding],
+    reporter: &ProgressReporter,
+) -> Result<DependencyRepairResult> {
+    let mut targets = findings
+        .iter()
+        .filter(|finding| finding.conflict_type == "missing_dependency")
+        .filter_map(|finding| finding.target_mod_id.clone())
+        .collect::<Vec<_>>();
+    targets.sort();
+    targets.dedup();
+
+    let mut result = DependencyRepairResult::default();
+    for target in targets {
+        match find_and_install_dependency(client, paths, instance, reporter, &target).await {
+            Ok(project_title) => result.installed.push(project_title),
+            Err(error) => result.failed.push(format!("{target}: {error}")),
+        }
+    }
+
+    Ok(result)
+}
+
+async fn find_and_install_dependency(
+    client: &Client,
+    paths: &LauncherPaths,
+    instance: &Instance,
+    reporter: &ProgressReporter,
+    target: &str,
+) -> Result<String> {
+    let normalized = normalize_mod_id(target);
+    let results = search_modrinth(
+        client,
+        target,
+        &instance.version_id,
+        instance.loader.as_deref(),
+        0,
+    )
+    .await?;
+    let project = results
+        .into_iter()
+        .find(|project| {
+            normalize_mod_id(&project.slug) == normalized
+                || normalize_mod_id(&project.title) == normalized
+                || normalize_mod_id(&project.project_id) == normalized
+        })
+        .with_context(|| format!("Modrinth 没有找到匹配项目：{target}"))?;
+    let versions = get_modrinth_versions(
+        client,
+        &project.project_id,
+        &instance.version_id,
+        instance.loader.as_deref(),
+    )
+    .await?;
+    let version = versions
+        .first()
+        .with_context(|| format!("Modrinth 项目 {} 没有兼容版本", project.title))?;
+    install_modrinth_version(client, paths, instance, &version.id, reporter).await?;
+    Ok(project.title)
+}
+
+fn normalize_mod_id(value: &str) -> String {
+    value
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 async fn install_version_recursive(

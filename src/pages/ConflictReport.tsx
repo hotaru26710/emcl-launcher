@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, RefreshCw, ShieldAlert } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/tauri";
 import type { ConflictReport as ConflictReportType } from "../api/types";
@@ -11,6 +11,7 @@ export function ConflictReport() {
   const { id } = useParams<{ id: string }>();
   const [reports, setReports] = useState<ConflictReportType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   const [message, setMessage] = useState("");
 
   const refresh = async () => {
@@ -29,6 +30,24 @@ export function ConflictReport() {
     void refresh();
   }, [id]);
 
+  const repair = async () => {
+    if (!id) return;
+    if (!window.confirm("将从 Modrinth 查找并安装缺失的必需依赖，已存在的文件会跳过。是否继续？")) return;
+    setRepairing(true);
+    setMessage("");
+    try {
+      const result = await api.repairInstanceDependencies(id);
+      const installed = result.installed.length ? `已补全：${result.installed.join("、")}` : "没有自动安装新依赖";
+      const failed = result.failed.length ? `；未解决：${result.failed.join("；")}` : "";
+      setMessage(`${installed}${failed}`);
+      await refresh();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setRepairing(false);
+    }
+  };
+
   return (
     <div className="animate-page mx-auto max-w-5xl">
       <Link to={id ? `/instances/${id}` : "/instances"} className="mb-5 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-200">
@@ -39,15 +58,26 @@ export function ConflictReport() {
         title="冲突报告"
         description="只做本地静态元数据比对，不删除模组，也不做运行时拦截。"
         action={
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void refresh()}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/8 disabled:opacity-40"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            刷新
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={repairing}
+              onClick={() => void repair()}
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
+            >
+              <Download size={16} />
+              {repairing ? "补全中..." : "自动补全缺失依赖"}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void refresh()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/8 disabled:opacity-40"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              刷新
+            </button>
+          </div>
         }
       />
 

@@ -94,6 +94,7 @@ pub fn run() {
             commands::community::search_modrinth_mods,
             commands::community::get_modrinth_versions,
             commands::community::install_modrinth_version,
+            commands::community::repair_instance_dependencies,
             commands::project::inspect_project_directory,
             commands::project::list_projects,
             commands::project::get_project,
