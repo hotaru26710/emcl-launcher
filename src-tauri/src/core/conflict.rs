@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::Result;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::core::metadata::{self, ParsedModMetadata};
@@ -215,22 +215,48 @@ fn persist_reports(
     findings: &[ConflictFinding],
 ) -> Result<()> {
     for finding in findings {
-        connection.execute(
-            "INSERT INTO conflict_reports (
-                instance_id, severity, type, source_mod_id, target_mod_id,
-                detail, suggestion, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![
-                instance_id,
-                finding.severity,
-                finding.conflict_type,
-                finding.source_mod_id,
-                finding.target_mod_id,
-                finding.detail,
-                finding.suggestion,
-                now_rfc3339()
-            ],
-        )?;
+        let existing = connection
+            .query_row(
+                "SELECT id FROM conflict_reports
+                 WHERE instance_id = ?1 AND severity = ?2 AND type = ?3
+                   AND source_mod_id IS ?4 AND target_mod_id IS ?5
+                 LIMIT 1",
+                params![
+                    instance_id,
+                    finding.severity,
+                    finding.conflict_type,
+                    finding.source_mod_id.as_deref(),
+                    finding.target_mod_id.as_deref()
+                ],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        let now = now_rfc3339();
+        if let Some(id) = existing {
+            connection.execute(
+                "UPDATE conflict_reports
+                 SET detail = ?1, suggestion = ?2, created_at = ?3
+                 WHERE id = ?4",
+                params![finding.detail, finding.suggestion, now, id],
+            )?;
+        } else {
+            connection.execute(
+                "INSERT INTO conflict_reports (
+                    instance_id, severity, type, source_mod_id, target_mod_id,
+                    detail, suggestion, created_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    instance_id,
+                    finding.severity,
+                    finding.conflict_type,
+                    finding.source_mod_id,
+                    finding.target_mod_id,
+                    finding.detail,
+                    finding.suggestion,
+                    now
+                ],
+            )?;
+        }
     }
     Ok(())
 }

@@ -166,6 +166,31 @@ fn migrate(connection: &Connection) -> Result<()> {
             .context("failed to run database migration 2")?;
     }
 
+    if version < 3 {
+        connection
+            .execute_batch(
+                "BEGIN;
+                 DELETE FROM conflict_reports
+                 WHERE id NOT IN (
+                     SELECT MAX(id)
+                     FROM conflict_reports
+                     GROUP BY instance_id, severity, type,
+                              COALESCE(source_mod_id, ''), COALESCE(target_mod_id, '')
+                 );
+                 CREATE UNIQUE INDEX IF NOT EXISTS idx_conflict_reports_unique
+                     ON conflict_reports(
+                         instance_id,
+                         severity,
+                         type,
+                         COALESCE(source_mod_id, ''),
+                         COALESCE(target_mod_id, '')
+                     );
+                 PRAGMA user_version = 3;
+                 COMMIT;",
+            )
+            .context("failed to run database migration 3")?;
+    }
+
     Ok(())
 }
 
