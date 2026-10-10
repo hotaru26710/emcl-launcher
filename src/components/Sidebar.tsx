@@ -17,8 +17,8 @@ const navigation = [
 export function Sidebar() {
   return (
     <aside className="relative z-20 w-20 shrink-0 p-3 pr-0">
-      <div className="group/sidebar glass-panel absolute bottom-3 left-3 top-3 z-30 flex w-[4.25rem] flex-col rounded-[30px] px-2 py-4 shadow-[0_18px_55px_rgba(2,6,23,0.42)] transition-[width,padding] duration-300 ease-out hover:w-[17.5rem] hover:px-3">
-        <div className="group flex items-center gap-3 rounded-3xl border border-white/[0.06] bg-white/[0.025] px-3 py-3">
+      <div className="group/sidebar glass-panel absolute bottom-3 left-3 top-3 z-30 flex w-[4.5rem] flex-col rounded-[30px] px-2 py-4 shadow-[0_18px_55px_rgba(2,6,23,0.42)] transition-[width,padding] duration-300 ease-out hover:w-[17.5rem] hover:px-3">
+        <div className="group flex items-center justify-center gap-0 rounded-3xl border border-white/[0.06] bg-white/[0.025] px-2 py-3 transition-all duration-300 group-hover/sidebar:justify-start group-hover/sidebar:gap-3 group-hover/sidebar:px-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_35px_rgba(34,211,238,0.13)] transition duration-500 group-hover:rotate-3 group-hover:scale-105">
             <Waves size={22} />
           </div>
@@ -39,7 +39,7 @@ export function Sidebar() {
                 to={item.to}
                 className={({ isActive }) =>
                   [
-                    "group relative flex items-center gap-3 overflow-hidden rounded-2xl px-3.5 py-3 text-sm transition-all duration-300",
+                    "group relative flex items-center justify-center gap-0 overflow-hidden rounded-2xl px-2 py-3 text-sm transition-all duration-300 group-hover/sidebar:justify-start group-hover/sidebar:gap-3 group-hover/sidebar:px-3.5",
                     isActive
                       ? "bg-gradient-to-r from-cyan-400/[0.13] to-blue-400/[0.035] text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.12)]"
                       : "text-slate-500 hover:translate-x-0.5 hover:bg-white/[0.045] hover:text-slate-100",
@@ -56,7 +56,7 @@ export function Sidebar() {
                     />
                     <Icon
                       size={18}
-                      className="transition-transform duration-300 group-hover:scale-110"
+                      className="shrink-0 transition-transform duration-300 group-hover:scale-110"
                     />
                     <span className="w-0 flex-1 overflow-hidden whitespace-nowrap font-medium opacity-0 transition-all duration-300 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100">
                       {item.label}
