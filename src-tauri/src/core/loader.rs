@@ -747,6 +747,15 @@ fn patch_installer_mirrors(source: &Path, destination: &Path) -> Result<PathBuf>
             continue;
         }
         let entry_name = enclosed.to_string_lossy().replace('\\', "/");
+        let upper_name = entry_name.to_ascii_uppercase();
+        if upper_name.starts_with("META-INF/")
+            && (upper_name.ends_with(".SF")
+                || upper_name.ends_with(".RSA")
+                || upper_name.ends_with(".DSA")
+                || upper_name.ends_with(".EC"))
+        {
+            continue;
+        }
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes)?;
 
