@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
-import { X } from "lucide-react";
+import { ArrowLeftRight, X } from "lucide-react";
 import { api } from "./api/tauri";
 import { Layout } from "./components/Layout";
 import { InstanceDetail } from "./pages/InstanceDetail";
@@ -13,19 +13,55 @@ import { useLauncherStore } from "./stores/launcher";
 function GlobalError() {
   const error = useLauncherStore((state) => state.lastError);
   const clearError = useLauncherStore((state) => state.clearError);
+  const settings = useLauncherStore((state) => state.settings);
+  const saveSettings = useLauncherStore((state) => state.saveSettings);
+  const [switching, setSwitching] = useState(false);
+
   if (!error) return null;
 
+  const networkLike = /请求失败|请求被拒绝|无法连接|连接失败|timeout|timed out|network|dns|tls|ssl|connect|maven/i.test(error);
+  const currentMirror = settings?.downloadMirror === "bmclapi" ? "bmclapi" : "official";
+  const targetMirror = currentMirror === "bmclapi" ? "official" : "bmclapi";
+
+  const switchMirror = async () => {
+    setSwitching(true);
+    try {
+      await saveSettings({ downloadMirror: targetMirror });
+      clearError();
+    } catch {
+      // The store will surface the switch failure instead.
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   return (
-    <div className="animate-card-in fixed bottom-5 right-5 z-50 flex max-w-xl items-start gap-3 rounded-[24px] border border-rose-400/20 bg-[#25131a]/95 px-4 py-3 text-sm text-rose-100 shadow-2xl backdrop-blur">
-      <div className="min-w-0 whitespace-pre-wrap">{error}</div>
-      <button
-        type="button"
-        onClick={clearError}
-        className="rounded-lg p-1 text-rose-300 transition hover:bg-white/5 hover:text-white"
-        aria-label="关闭错误提示"
-      >
-        <X size={16} />
-      </button>
+    <div className="animate-card-in fixed bottom-5 right-5 z-50 w-[min(34rem,calc(100vw-2.5rem))] rounded-[26px] border border-rose-400/20 bg-[#25131a]/95 p-4 text-sm text-rose-100 shadow-2xl backdrop-blur-xl">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1 whitespace-pre-wrap">{error}</div>
+        <button
+          type="button"
+          onClick={clearError}
+          className="rounded-lg p-1 text-rose-300 transition hover:bg-white/5 hover:text-white"
+          aria-label="关闭错误提示"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      {networkLike ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rose-300/10 pt-3">
+          <span className="text-xs text-rose-200/70">网络请求失败，可以切换下载源：</span>
+          <button
+            type="button"
+            disabled={switching}
+            onClick={() => void switchMirror()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:opacity-40"
+          >
+            <ArrowLeftRight size={13} />
+            {switching ? "切换中..." : `切换到 ${targetMirror === "bmclapi" ? "BMCLAPI 镜像" : "官方源"}`}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

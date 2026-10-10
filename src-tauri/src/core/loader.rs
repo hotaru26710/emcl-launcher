@@ -232,37 +232,66 @@ async fn install_installer_loader(
     loader_version: &str,
     java_path: &Path,
 ) -> Result<()> {
-    let artifact = match loader {
-        LoaderType::Neoforge => format!(
-            "https://maven.neoforged.net/releases/net/neoforged/neoforge/{loader_version}/neoforge-{loader_version}-installer.jar"
+    let (official_artifact, mirror_artifact) = match loader {
+        LoaderType::Neoforge => (
+            format!(
+                "https://maven.neoforged.net/releases/net/neoforged/neoforge/{loader_version}/neoforge-{loader_version}-installer.jar"
+            ),
+            format!(
+                "https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/{loader_version}/neoforge-{loader_version}-installer.jar"
+            ),
         ),
-        LoaderType::Forge => format!(
-            "https://maven.minecraftforge.net/net/minecraftforge/forge/{loader_version}/forge-{loader_version}-installer.jar"
+        LoaderType::Forge => (
+            format!(
+                "https://maven.minecraftforge.net/net/minecraftforge/forge/{loader_version}/forge-{loader_version}-installer.jar"
+            ),
+            format!(
+                "https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/{loader_version}/forge-{loader_version}-installer.jar"
+            ),
         ),
         _ => bail!("当前加载器不需要 installer"),
+    };
+    let artifact_urls = if mirror == "bmclapi" {
+        vec![mirror_artifact, official_artifact]
+    } else {
+        vec![official_artifact, mirror_artifact]
     };
 
     let installer_dir = paths.version_dir(version_id);
     fs::create_dir_all(&installer_dir).await?;
     let installer_path = installer_dir.join("installer.jar");
-    install::download_artifacts(ArtifactDownloadRequest {
-        client,
-        mirror,
-        concurrency,
-        force_redownload: false,
-        stage: "loader-installer",
-        message: "正在下载加载器安装器",
-        artifacts: vec![ArtifactDownload {
-            url: artifact,
-            destination: installer_path.clone(),
-            sha1: None,
-            size: None,
-            label: format!("{} installer", loader.as_str()),
-            version_id: version_id.to_string(),
-        }],
-        reporter,
-    })
-    .await?;
+    let mut installer_downloaded = false;
+    let mut download_error = String::new();
+    for artifact_url in artifact_urls {
+        match install::download_artifacts(ArtifactDownloadRequest {
+            client,
+            mirror,
+            concurrency,
+            force_redownload: false,
+            stage: "loader-installer",
+            message: "正在下载加载器安装器",
+            artifacts: vec![ArtifactDownload {
+                url: artifact_url,
+                destination: installer_path.clone(),
+                sha1: None,
+                size: None,
+                label: format!("{} installer", loader.as_str()),
+                version_id: version_id.to_string(),
+            }],
+            reporter,
+        })
+        .await
+        {
+            Ok(()) => {
+                installer_downloaded = true;
+                break;
+            }
+            Err(error) => download_error = error.to_string(),
+        }
+    }
+    if !installer_downloaded {
+        bail!("加载器安装器下载失败: {download_error}");
+    }
 
     let install_root = paths
         .shared_dir()
@@ -358,8 +387,14 @@ async fn resolve_neoforge_version(
     if let Some(requested) = requested.filter(|value| !value.trim().is_empty()) {
         return Ok(requested.trim().to_string());
     }
-    let url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
-    let xml = get_text(client, url).await?;
+    let xml = get_text_with_fallback(
+        client,
+        &[
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
+            "https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/maven-metadata.xml",
+        ],
+    )
+    .await?;
     let prefix = game_version
         .strip_prefix("1.")
         .unwrap_or(game_version)
@@ -367,9 +402,7 @@ async fn resolve_neoforge_version(
     let versions = xml_versions(&xml)?;
     versions
         .into_iter()
-        .filter(|version| {
-            version.starts_with(&format!("{prefix}.")) || version.starts_with(&prefix)
-        })
+        .filter(|version| version.starts_with(&format!("{prefix}.")))
         .max_by(|left, right| version_cmp(left, right))
         .context("没有找到匹配的 NeoForge 版本")
 }
@@ -382,21 +415,26 @@ async fn resolve_forge_version(
     if let Some(requested) = requested.filter(|value| !value.trim().is_empty()) {
         return Ok(requested.trim().to_string());
     }
-    let url = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
-    let value = get_json(client, url).await?;
-    for key in [
-        format!("{game_version}-recommended"),
-        format!("{game_version}-latest"),
-    ] {
-        if let Some(version) = value
-            .get("promos")
-            .and_then(|promos| promos.get(&key))
-            .and_then(Value::as_str)
-        {
-            return Ok(format!("{game_version}-{version}"));
-        }
-    }
-    bail!("没有找到匹配的 Forge 版本")
+
+    let xml = get_text_with_fallback(
+        client,
+        &[
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
+            "https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/maven-metadata.xml",
+        ],
+    )
+    .await?;
+    let prefix = format!("{game_version}-");
+    xml_versions(&xml)?
+        .into_iter()
+        .filter_map(|version| {
+            version
+                .strip_prefix(&prefix)
+                .map(|loader_version| (version.clone(), loader_version.to_string()))
+        })
+        .max_by(|left, right| version_cmp(&left.1, &right.1))
+        .map(|(version, _)| version)
+        .with_context(|| format!("没有找到匹配 Minecraft {game_version} 的 Forge 版本"))
 }
 
 fn latest_loader(value: &Value, field: &str) -> Result<String> {
@@ -679,16 +717,35 @@ async fn get_json(client: &Client, url: &str) -> Result<Value> {
 }
 
 async fn get_text(client: &Client, url: &str) -> Result<String> {
-    client
+    let response = client
         .get(url)
         .send()
         .await
-        .with_context(|| format!("请求失败: {url}"))?
-        .error_for_status()
-        .with_context(|| format!("请求被拒绝: {url}"))?
+        .with_context(|| format!("请求失败: {url}"))?;
+    let status = response.status();
+    let text = response
         .text()
         .await
-        .with_context(|| format!("无法读取响应: {url}"))
+        .with_context(|| format!("无法读取响应: {url}"))?;
+    if !status.is_success() {
+        bail!("请求失败 ({status}): {url}: {}", compact_text(&text));
+    }
+    Ok(text)
+}
+
+async fn get_text_with_fallback(client: &Client, urls: &[&str]) -> Result<String> {
+    let mut last_error = None;
+    for url in urls {
+        match get_text(client, url).await {
+            Ok(text) => return Ok(text),
+            Err(error) => last_error = Some(error),
+        }
+    }
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("没有可用的下载源")))
+}
+
+fn compact_text(text: &str) -> String {
+    text.chars().take(300).collect()
 }
 
 #[cfg(test)]
@@ -700,6 +757,40 @@ mod tests {
         assert_eq!(
             maven_path("net.fabricmc:fabric-loader:0.16.10"),
             "net/fabricmc/fabric-loader/0.16.10/fabric-loader-0.16.10.jar"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires network access"]
+    async fn resolves_neoforge_with_bmcl_fallback() {
+        let client = Client::builder()
+            .user_agent("EMCL-Loader-test/0.1.0")
+            .connect_timeout(std::time::Duration::from_secs(8))
+            .build()
+            .unwrap();
+        let version = resolve_neoforge_version(&client, "1.21.1", None)
+            .await
+            .unwrap();
+        assert!(
+            version.starts_with("21.1."),
+            "resolved NeoForge version: {version}"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires network access"]
+    async fn resolves_forge_with_maven_fallback() {
+        let client = Client::builder()
+            .user_agent("EMCL-Loader-test/0.1.0")
+            .connect_timeout(std::time::Duration::from_secs(8))
+            .build()
+            .unwrap();
+        let version = resolve_forge_version(&client, "1.21.1", None)
+            .await
+            .unwrap();
+        assert!(
+            version.starts_with("1.21.1-"),
+            "resolved Forge version: {version}"
         );
     }
 

@@ -27,7 +27,7 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
     let connection = schema::open_database(&paths.database_file())?;
     let http = Client::builder()
         .user_agent("EMCL-Launcher/0.1.0")
-        .connect_timeout(Duration::from_secs(20))
+        .connect_timeout(Duration::from_secs(8))
         .timeout(Duration::from_secs(300))
         .pool_max_idle_per_host(32)
         .build()?;
