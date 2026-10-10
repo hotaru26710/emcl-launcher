@@ -13,6 +13,7 @@ pub mod launch;
 pub mod loader;
 pub mod mcim;
 pub mod metadata;
+pub mod mod_source;
 pub mod mods;
 pub mod paths;
 pub mod project;

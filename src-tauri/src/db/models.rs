@@ -73,6 +73,8 @@ pub struct StoredAccount {
 pub struct Settings {
     pub download_mirror: String,
     pub download_concurrency: u32,
+    pub mod_api_mode: String,
+    pub curseforge_api_key: Option<String>,
     pub default_java_path: Option<String>,
     pub microsoft_client_id: Option<String>,
     pub theme: String,
@@ -90,6 +92,8 @@ pub struct Settings {
 pub struct UpdateSettingsInput {
     pub download_mirror: Option<String>,
     pub download_concurrency: Option<u32>,
+    pub mod_api_mode: Option<String>,
+    pub curseforge_api_key: Option<String>,
     pub microsoft_client_id: Option<String>,
     pub theme: Option<String>,
     pub custom_theme: Option<String>,

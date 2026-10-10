@@ -191,6 +191,79 @@ fn migrate(connection: &Connection) -> Result<()> {
             .context("failed to run database migration 3")?;
     }
 
+    if version < 4 {
+        connection
+            .execute_batch(
+                "BEGIN;
+                 CREATE TABLE IF NOT EXISTS mod_sources (
+                     platform TEXT NOT NULL,
+                     project_id TEXT NOT NULL,
+                     slug TEXT NOT NULL DEFAULT '',
+                     title TEXT NOT NULL,
+                     description TEXT NOT NULL DEFAULT '',
+                     icon_url TEXT,
+                     author TEXT NOT NULL DEFAULT '',
+                     downloads INTEGER NOT NULL DEFAULT 0,
+                     categories_json TEXT NOT NULL DEFAULT '[]',
+                     updated_at TEXT NOT NULL,
+                     PRIMARY KEY(platform, project_id)
+                 );
+
+                 CREATE TABLE IF NOT EXISTS mod_versions (
+                     platform TEXT NOT NULL,
+                     project_id TEXT NOT NULL,
+                     version_id TEXT NOT NULL,
+                     version_number TEXT NOT NULL,
+                     game_versions_json TEXT NOT NULL DEFAULT '[]',
+                     loaders_json TEXT NOT NULL DEFAULT '[]',
+                     download_url TEXT NOT NULL DEFAULT '',
+                     file_name TEXT NOT NULL DEFAULT '',
+                     file_size INTEGER NOT NULL DEFAULT 0,
+                     sha1 TEXT,
+                     dependencies_json TEXT NOT NULL DEFAULT '[]',
+                     release_type TEXT NOT NULL DEFAULT 'release',
+                     published_at TEXT NOT NULL DEFAULT '',
+                     PRIMARY KEY(platform, project_id, version_id)
+                 );
+
+                 CREATE TABLE IF NOT EXISTS installed_mods (
+                     instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+                     mod_id TEXT NOT NULL,
+                     mod_name TEXT,
+                     version TEXT,
+                     platform TEXT NOT NULL,
+                     project_id TEXT NOT NULL,
+                     version_id TEXT,
+                     file_name TEXT NOT NULL,
+                     sha256 TEXT NOT NULL,
+                     source_type TEXT NOT NULL DEFAULT 'community',
+                     update_available INTEGER NOT NULL DEFAULT 0,
+                     latest_version_id TEXT,
+                     dependency_of TEXT,
+                     PRIMARY KEY(instance_id, mod_id)
+                 );
+
+                 CREATE TABLE IF NOT EXISTS search_cache (
+                     query_hash TEXT NOT NULL,
+                     platform TEXT NOT NULL,
+                     response_json TEXT NOT NULL,
+                     cached_at TEXT NOT NULL,
+                     PRIMARY KEY(query_hash, platform)
+                 );
+
+                 CREATE INDEX IF NOT EXISTS idx_mod_sources_platform_downloads
+                     ON mod_sources(platform, downloads DESC);
+                 CREATE INDEX IF NOT EXISTS idx_mod_versions_project_published
+                     ON mod_versions(platform, project_id, published_at DESC);
+                 CREATE INDEX IF NOT EXISTS idx_installed_mods_instance
+                     ON installed_mods(instance_id);
+
+                 PRAGMA user_version = 4;
+                 COMMIT;",
+            )
+            .context("failed to run database migration 4")?;
+    }
+
     Ok(())
 }
 
@@ -212,6 +285,7 @@ fn seed_settings(connection: &Connection) -> Result<()> {
         ("game_height", "480"),
         ("fullscreen", "false"),
         ("theme", "system"),
+        ("mod_api_mode", "auto"),
     ] {
         connection.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?1, ?2)",

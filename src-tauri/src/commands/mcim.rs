@@ -4,10 +4,24 @@ use serde::Deserialize;
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
+use crate::commands::settings::load_settings;
 use crate::core::install::{self, ProgressReporter};
 use crate::core::instance as instance_core;
 use crate::core::mcim;
+use crate::core::mod_source::curseforge::CurseForgeClient;
+use crate::core::mod_source::{ApiRouter, ModApiConfig, ProjectDetails, SearchRequest};
 use crate::AppState;
+
+fn curseforge_client(state: &AppState) -> Result<CurseForgeClient, String> {
+    let settings = load_settings(state)?;
+    Ok(CurseForgeClient::new(ApiRouter::new(
+        state.http.clone(),
+        ModApiConfig {
+            force_official: settings.mod_api_mode == "official",
+            curseforge_api_key: settings.curseforge_api_key,
+        },
+    )))
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,15 +45,43 @@ pub async fn search_mcim_curseforge_mods(
     state: State<'_, AppState>,
     input: SearchMcimInput,
 ) -> Result<Vec<mcim::McimCurseForgeSearchResult>, String> {
-    mcim::search_curseforge(
-        &state.http,
-        &input.query,
-        &input.game_version,
-        input.loader.as_deref(),
-        input.offset.unwrap_or(0),
-    )
-    .await
-    .map_err(|error| error.to_string())
+    let hits = curseforge_client(&state)?
+        .search(&{
+            let mut request = SearchRequest::new(input.query, input.game_version);
+            request.loader = input.loader;
+            request.offset = input.offset.unwrap_or(0);
+            request
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(hits
+        .into_iter()
+        .filter_map(|hit| {
+            let id = hit.project_id.parse::<u64>().ok()?;
+            Some(mcim::McimCurseForgeSearchResult {
+                id,
+                project_id: hit.project_id,
+                slug: hit.slug,
+                title: hit.title,
+                description: hit.description,
+                icon_url: hit.icon_url,
+                downloads: hit.downloads,
+                author: hit.author,
+                categories: hit.categories,
+            })
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn get_mcim_curseforge_project(
+    state: State<'_, AppState>,
+    mod_id: u64,
+) -> Result<ProjectDetails, String> {
+    curseforge_client(&state)?
+        .project(mod_id)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -49,9 +91,33 @@ pub async fn get_mcim_curseforge_files(
     game_version: String,
     loader: Option<String>,
 ) -> Result<Vec<mcim::McimCurseForgeFile>, String> {
-    mcim::get_curseforge_files(&state.http, mod_id, &game_version, loader.as_deref())
+    let versions = curseforge_client(&state)?
+        .files(mod_id, &game_version, loader.as_deref())
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    Ok(versions
+        .into_iter()
+        .filter_map(|version| {
+            let id = version.version_id.parse::<u64>().ok()?;
+            let file = version.files.into_iter().next()?;
+            Some(mcim::McimCurseForgeFile {
+                id,
+                mod_id,
+                display_name: version.name,
+                file_name: file.file_name,
+                file_date: version.published_at,
+                file_length: file.size,
+                download_url: Some(file.url),
+                game_versions: version.game_versions,
+                release_type: match version.release_type.as_str() {
+                    "beta" => 2,
+                    "alpha" => 3,
+                    _ => 1,
+                },
+                sha1: file.sha1,
+            })
+        })
+        .collect())
 }
 
 #[tauri::command]

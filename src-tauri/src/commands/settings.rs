@@ -59,6 +59,11 @@ pub fn update_settings(
     if let Some(mirror) = input.download_mirror {
         set_setting(&connection, "download_mirror", &mirror).map_err(|error| error.to_string())?;
     }
+    if let Some(mode) = &input.mod_api_mode {
+        if mode != "auto" && mode != "official" {
+            return Err("mod API mode must be auto or official".to_string());
+        }
+    }
     if let Some(concurrency) = input.download_concurrency {
         set_setting(
             &connection,
@@ -66,6 +71,19 @@ pub fn update_settings(
             &concurrency.clamp(1, 16).to_string(),
         )
         .map_err(|error| error.to_string())?;
+    }
+    if let Some(mode) = input.mod_api_mode {
+        set_setting(&connection, "mod_api_mode", &mode).map_err(|error| error.to_string())?;
+    }
+    if let Some(api_key) = input.curseforge_api_key {
+        if api_key.trim().is_empty() {
+            connection
+                .execute("DELETE FROM settings WHERE key = 'curseforge_api_key'", [])
+                .map_err(|error| error.to_string())?;
+        } else {
+            set_setting(&connection, "curseforge_api_key", api_key.trim())
+                .map_err(|error| error.to_string())?;
+        }
     }
     if let Some(memory) = input.default_memory_mb {
         set_setting(
@@ -137,6 +155,9 @@ pub fn update_settings(
 fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow::Result<Settings> {
     let mirror = get_setting(connection, "download_mirror")?
         .unwrap_or_else(|| DEFAULT_DOWNLOAD_MIRROR.to_string());
+    let mod_api_mode =
+        get_setting(connection, "mod_api_mode")?.unwrap_or_else(|| "auto".to_string());
+    let curseforge_api_key = get_setting(connection, "curseforge_api_key")?;
     let concurrency = get_setting(connection, "download_concurrency")?
         .unwrap_or_else(|| DEFAULT_DOWNLOAD_CONCURRENCY.to_string())
         .parse::<u32>()
@@ -168,6 +189,8 @@ fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow
     Ok(Settings {
         download_mirror: mirror,
         download_concurrency: concurrency,
+        mod_api_mode,
+        curseforge_api_key,
         default_java_path,
         microsoft_client_id,
         theme,

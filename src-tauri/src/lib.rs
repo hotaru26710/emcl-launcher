@@ -30,7 +30,10 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
 
     let connection = schema::open_database(&paths.database_file())?;
     let http = Client::builder()
-        .user_agent("EMCL-Launcher/0.1.0")
+        .user_agent(format!(
+            "EmberLauncher/{} (+https://github.com/hotaru26710/emcl-launcher)",
+            env!("CARGO_PKG_VERSION")
+        ))
         .connect_timeout(Duration::from_secs(8))
         .read_timeout(Duration::from_secs(30))
         .timeout(Duration::from_secs(300))
@@ -96,12 +99,15 @@ pub fn run() {
             commands::mods::delete_mod,
             commands::community::search_modrinth_mods,
             commands::community::get_modrinth_versions,
+            commands::community::get_modrinth_project,
+            commands::community::get_modrinth_version,
             commands::community::install_modrinth_version,
             commands::community::repair_instance_dependencies,
             commands::github::search_github_mods,
             commands::github::get_github_releases,
             commands::github::install_github_release_asset,
             commands::mcim::search_mcim_curseforge_mods,
+            commands::mcim::get_mcim_curseforge_project,
             commands::mcim::get_mcim_curseforge_files,
             commands::mcim::install_mcim_curseforge_file,
             commands::project::inspect_project_directory,

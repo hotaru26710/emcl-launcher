@@ -4,11 +4,29 @@ use serde::Deserialize;
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
+use crate::commands::settings::load_settings;
 use crate::core::community;
 use crate::core::conflict::ConflictFinding;
 use crate::core::install::{self, ProgressReporter};
 use crate::core::instance as instance_core;
+use crate::core::mod_source::modrinth::ModrinthClient;
+use crate::core::mod_source::{ApiRouter, ModApiConfig, ProjectDetails, VersionInfo};
 use crate::AppState;
+
+fn mod_api_config(state: &AppState) -> Result<ModApiConfig, String> {
+    let settings = load_settings(state)?;
+    Ok(ModApiConfig {
+        force_official: settings.mod_api_mode == "official",
+        curseforge_api_key: settings.curseforge_api_key,
+    })
+}
+
+fn modrinth_client(state: &AppState) -> Result<ModrinthClient, String> {
+    Ok(ModrinthClient::new(ApiRouter::new(
+        state.http.clone(),
+        mod_api_config(state)?,
+    )))
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,15 +49,32 @@ pub async fn search_modrinth_mods(
     state: State<'_, AppState>,
     input: SearchModrinthInput,
 ) -> Result<Vec<community::ModrinthSearchResult>, String> {
-    community::search_modrinth(
-        &state.http,
-        &input.query,
-        &input.game_version,
-        input.loader.as_deref(),
-        input.offset.unwrap_or(0),
-    )
-    .await
-    .map_err(|error| error.to_string())
+    let client = modrinth_client(&state)?;
+    let hits = client
+        .search(&{
+            let mut request =
+                crate::core::mod_source::SearchRequest::new(input.query, input.game_version);
+            request.loader = input.loader;
+            request.offset = input.offset.unwrap_or(0);
+            request
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(hits
+        .into_iter()
+        .map(|hit| community::ModrinthSearchResult {
+            project_id: hit.project_id,
+            slug: hit.slug,
+            title: hit.title,
+            description: hit.description,
+            icon_url: hit.icon_url,
+            downloads: hit.downloads,
+            follows: hit.follows,
+            author: hit.author,
+            categories: hit.categories,
+            versions: hit.versions,
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -49,9 +84,68 @@ pub async fn get_modrinth_versions(
     game_version: String,
     loader: Option<String>,
 ) -> Result<Vec<community::ModrinthVersionInfo>, String> {
-    community::get_modrinth_versions(&state.http, &project_id, &game_version, loader.as_deref())
+    let client = modrinth_client(&state)?;
+    let versions = client
+        .versions(&project_id, &game_version, loader.as_deref())
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(map_modrinth_versions(versions))
+}
+
+#[tauri::command]
+pub async fn get_modrinth_project(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<ProjectDetails, String> {
+    modrinth_client(&state)?
+        .project(&project_id)
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_modrinth_version(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> Result<VersionInfo, String> {
+    modrinth_client(&state)?
+        .version(&version_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn map_modrinth_versions(versions: Vec<VersionInfo>) -> Vec<community::ModrinthVersionInfo> {
+    versions
+        .into_iter()
+        .enumerate()
+        .map(|(index, version)| community::ModrinthVersionInfo {
+            id: version.version_id,
+            project_id: version.project_id,
+            name: version.name,
+            version_number: version.version_number,
+            version_type: version.release_type,
+            game_versions: version.game_versions,
+            loaders: version.loaders,
+            date_published: version.published_at,
+            downloads: version.downloads,
+            recommended: index == 0,
+            files: version
+                .files
+                .into_iter()
+                .filter(|file| file.url.starts_with("http"))
+                .map(|file| community::ModrinthFile {
+                    url: file.url,
+                    filename: file.file_name,
+                    primary: file.primary,
+                    size: file.size,
+                    hashes: community::ModrinthHashes {
+                        sha1: file.sha1,
+                        sha512: file.sha512,
+                    },
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 #[tauri::command]

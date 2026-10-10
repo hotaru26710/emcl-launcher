@@ -275,6 +275,8 @@ export interface UpdateInstanceInput {
 export interface Settings {
   downloadMirror: "official" | "bmclapi" | string;
   downloadConcurrency: number;
+  modApiMode: "auto" | "official" | string;
+  curseforgeApiKey?: string | null;
   defaultJavaPath?: string | null;
   microsoftClientId?: string | null;
   theme: ThemeMode;
@@ -500,6 +502,8 @@ export interface JavaRecommendation {
 export interface UpdateSettingsInput {
   downloadMirror?: string;
   downloadConcurrency?: number;
+  modApiMode?: "auto" | "official" | string;
+  curseforgeApiKey?: string;
   microsoftClientId?: string;
   theme?: ThemeMode;
   customTheme?: string;

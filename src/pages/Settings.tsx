@@ -8,6 +8,7 @@ import {
   Gamepad2,
   Gauge,
   Globe2,
+  KeyRound,
   Palette,
   RefreshCw,
   ShieldCheck,
@@ -38,6 +39,8 @@ export function SettingsPage() {
   const javaInstallations = useLauncherStore((state) => state.javaInstallations);
 
   const [mirror, setMirror] = useState<"official" | "bmclapi">("official");
+  const [modApiMode, setModApiMode] = useState<"auto" | "official">("auto");
+  const [curseforgeApiKey, setCurseforgeApiKey] = useState("");
   const [concurrency, setConcurrency] = useState(8);
   const [defaultJavaPath, setDefaultJavaPath] = useState<string | null>(null);
   const [microsoftClientId, setMicrosoftClientId] = useState("");
@@ -59,6 +62,8 @@ export function SettingsPage() {
   useEffect(() => {
     if (!settings) return;
     setMirror(settings.downloadMirror === "bmclapi" ? "bmclapi" : "official");
+    setModApiMode(settings.modApiMode === "official" ? "official" : "auto");
+    setCurseforgeApiKey(settings.curseforgeApiKey ?? "");
     setConcurrency(settings.downloadConcurrency);
     setDefaultJavaPath(settings.defaultJavaPath ?? null);
     setMicrosoftClientId(settings.microsoftClientId ?? "");
@@ -93,6 +98,8 @@ export function SettingsPage() {
       await saveSettings({
         downloadMirror: mirror,
         downloadConcurrency: concurrency,
+        modApiMode,
+        curseforgeApiKey,
         microsoftClientId,
         theme,
         customTheme: JSON.stringify(customTheme),
@@ -303,6 +310,50 @@ export function SettingsPage() {
               </button>
             </div>
           </div>
+        </section>
+
+        <section className="glass-panel hover-lift rounded-[28px] p-5">
+          <div className="flex items-center gap-2">
+            <KeyRound size={17} className="text-cyan-300" />
+            <h2 className="text-sm font-semibold text-slate-200">社区模组 API</h2>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            默认优先使用 MCIM 镜像；镜像缓存过期或不可用时自动回落官方 API。CurseForge 官方 API Key 只保存在本机数据库，不会上传。
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {[
+              { id: "auto" as const, title: "自动 Fallback", description: "优先 MCIM，失败或缓存超过 7 天时使用官方 API。" },
+              { id: "official" as const, title: "强制官方", description: "跳过 MCIM，完全使用 Modrinth 和 CurseForge 官方接口。" },
+            ].map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setModApiMode(option.id)}
+                className={[
+                  "rounded-2xl border p-4 text-left transition",
+                  modApiMode === option.id
+                    ? "border-cyan-300/30 bg-cyan-300/[0.08]"
+                    : "border-white/8 bg-slate-950/30 hover:border-white/15",
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-slate-100">{option.title}</span>
+                  {modApiMode === option.id ? <Check size={16} className="text-cyan-300" /> : null}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-500">{option.description}</p>
+              </button>
+            ))}
+          </div>
+          <label className="mt-4 block">
+            <span className="text-xs text-slate-500">CurseForge API Key（可选）</span>
+            <input
+              type="password"
+              value={curseforgeApiKey}
+              onChange={(event) => setCurseforgeApiKey(event.currentTarget.value)}
+              placeholder="官方 Fallback 需要，MCIM 模式下可留空"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
+            />
+          </label>
         </section>
 
         <section className="glass-panel hover-lift rounded-[28px] p-5">
