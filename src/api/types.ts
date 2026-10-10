@@ -102,6 +102,19 @@ export interface UpdateProjectInput {
   autoDeploy?: boolean | null;
 }
 
+export interface BuildArtifact {
+  id: string;
+  projectId: string;
+  filePath: string;
+  sha256: string;
+  fileSize: number;
+  builtAt: string;
+  gitCommit?: string | null;
+  gitBranch?: string | null;
+  status: string;
+  deployedInstanceIds: string[];
+}
+
 export interface Instance {
   id: string;
   name: string;

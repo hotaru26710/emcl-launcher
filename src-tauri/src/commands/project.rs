@@ -2,8 +2,10 @@ use std::path::Path;
 
 use tauri::State;
 
-use crate::core::project;
-use crate::db::models::{CreateProjectInput, LinkedProjectInstance, Project, UpdateProjectInput};
+use crate::core::{artifact, project};
+use crate::db::models::{
+    BuildArtifact, CreateProjectInput, LinkedProjectInstance, Project, UpdateProjectInput,
+};
 use crate::AppState;
 
 #[tauri::command]
@@ -83,4 +85,34 @@ pub fn list_project_instances(
 ) -> Result<Vec<LinkedProjectInstance>, String> {
     let connection = state.db.lock().map_err(|error| error.to_string())?;
     project::list_project_instances(&connection, &project_id).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn scan_project_artifacts(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<Vec<BuildArtifact>, String> {
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    let project = project::get_project(&connection, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "工程不存在".to_string())?;
+    artifact::scan_project_artifacts(&connection, &project).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_build_artifacts(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<Vec<BuildArtifact>, String> {
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    artifact::list_build_artifacts(&connection, &project_id).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_build_artifact(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Option<BuildArtifact>, String> {
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    artifact::get_build_artifact(&connection, &id).map_err(|error| error.to_string())
 }

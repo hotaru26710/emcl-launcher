@@ -98,6 +98,9 @@ pub fn run() {
             commands::project::link_project_instance,
             commands::project::unlink_project_instance,
             commands::project::list_project_instances,
+            commands::project::scan_project_artifacts,
+            commands::project::list_build_artifacts,
+            commands::project::get_build_artifact,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

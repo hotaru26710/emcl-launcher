@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AccountSummary,
+  BuildArtifact,
   CommunityInstallResult,
   CreateInstanceInput,
   CreateProjectInput,
@@ -77,6 +78,12 @@ export const api = {
     invoke<void>("unlink_project_instance", { projectId, instanceId }),
   listProjectInstances: (projectId: string) =>
     invoke<LinkedProjectInstance[]>("list_project_instances", { projectId }),
+  scanProjectArtifacts: (projectId: string) =>
+    invoke<BuildArtifact[]>("scan_project_artifacts", { projectId }),
+  listBuildArtifacts: (projectId: string) =>
+    invoke<BuildArtifact[]>("list_build_artifacts", { projectId }),
+  getBuildArtifact: (id: string) =>
+    invoke<BuildArtifact | null>("get_build_artifact", { id }),
   setActiveAccount: (id: string) => invoke<void>("set_active_account", { id }),
   getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
   startMicrosoftLogin: () => invoke<DeviceCodeResponse>("start_microsoft_login"),

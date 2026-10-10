@@ -8,9 +8,10 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/tauri";
-import type { LinkedProjectInstance, Project } from "../api/types";
+import type { BuildArtifact, LinkedProjectInstance, Project } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
+import { formatBytes, formatDate } from "../lib/format";
 import { useLauncherStore } from "../stores/launcher";
 
 export function ProjectDetail() {
@@ -18,18 +19,22 @@ export function ProjectDetail() {
   const instances = useLauncherStore((state) => state.instances);
   const [project, setProject] = useState<Project | null>(null);
   const [links, setLinks] = useState<LinkedProjectInstance[]>([]);
+  const [artifacts, setArtifacts] = useState<BuildArtifact[]>([]);
   const [selectedInstance, setSelectedInstance] = useState("");
+  const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState("");
 
   const refresh = async () => {
     if (!id) return;
     try {
-      const [nextProject, nextLinks] = await Promise.all([
+      const [nextProject, nextLinks, nextArtifacts] = await Promise.all([
         api.getProject(id),
         api.listProjectInstances(id),
+        api.listBuildArtifacts(id),
       ]);
       setProject(nextProject);
       setLinks(nextLinks);
+      setArtifacts(nextArtifacts);
     } catch (error) {
       setMessage(errorMessage(error));
     }
@@ -38,6 +43,21 @@ export function ProjectDetail() {
   useEffect(() => {
     void refresh();
   }, [id]);
+
+  const scan = async () => {
+    if (!id) return;
+    setScanning(true);
+    setMessage("");
+    try {
+      const next = await api.scanProjectArtifacts(id);
+      setArtifacts(next);
+      setMessage(next.length > 0 ? `已识别 ${next.length} 条构建历史。` : "没有识别到构建产物。");
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const link = async () => {
     if (!id || !selectedInstance) return;
@@ -80,10 +100,12 @@ export function ProjectDetail() {
         action={
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/8"
+            disabled={scanning}
+            onClick={() => void scan()}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/8 disabled:opacity-40"
           >
-            <ScanSearch size={16} />
-            扫描产物
+            <ScanSearch size={16} className={scanning ? "animate-spin" : ""} />
+            {scanning ? "扫描中..." : "扫描产物"}
           </button>
         }
       />
@@ -172,12 +194,41 @@ export function ProjectDetail() {
       </div>
 
       <section className="glass-panel mt-4 rounded-[28px] p-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold text-slate-200">构建产物</h2>
-            <p className="mt-1 text-xs text-slate-600">下一步会扫描输出目录、排除非主 jar 并读取 jar 内元数据。</p>
+            <p className="mt-1 text-xs text-slate-600">已排除 sources、javadoc、dev 等辅助 jar，并读取主 jar 元数据和 SHA-256。</p>
           </div>
-          <StatusPill tone="slate">待接入</StatusPill>
+          <Link
+            to={`/projects/${project.id}/timeline`}
+            className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-2 text-xs text-cyan-200 transition hover:bg-cyan-300/[0.12]"
+          >
+            打开时间线
+          </Link>
+        </div>
+        <div className="mt-4 space-y-2">
+          {artifacts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-slate-600">
+              还没有扫描到构建产物。
+            </div>
+          ) : (
+            artifacts.map((artifact) => (
+              <div key={artifact.id} className="rounded-2xl border border-white/8 bg-slate-950/30 p-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-slate-200">{artifact.filePath.split(/[\\/]/).pop()}</div>
+                    <div className="mt-1 font-mono text-[10px] text-slate-600">{artifact.sha256.slice(0, 16)}… · {formatBytes(artifact.fileSize)}</div>
+                  </div>
+                  <StatusPill tone="emerald">{artifact.status}</StatusPill>
+                </div>
+                <div className="mt-2 text-[10px] text-slate-600">
+                  {formatDate(artifact.builtAt)}
+                  {artifact.gitBranch ? ` · ${artifact.gitBranch}` : ""}
+                  {artifact.gitCommit ? ` · ${artifact.gitCommit.slice(0, 8)}` : ""}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>
