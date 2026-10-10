@@ -8,12 +8,25 @@ import {
   Gamepad2,
   Gauge,
   Globe2,
+  Palette,
   RefreshCw,
   ShieldCheck,
   Save,
 } from "lucide-react";
+import type { CustomThemeColors, ThemeMode } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { useLauncherStore } from "../stores/launcher";
+
+const themePresets: Array<{ id: ThemeMode; label: string; colors: string[] }> = [
+  { id: "system", label: "跟随系统", colors: ["#07111f", "#ffffff", "#22d3ee"] },
+  { id: "dark", label: "深色", colors: ["#07111f", "#0b1929", "#22d3ee"] },
+  { id: "light", label: "亮色", colors: ["#eef4f8", "#ffffff", "#0891b2"] },
+  { id: "pink", label: "粉白", colors: ["#fff1f6", "#ffffff", "#ec4899"] },
+  { id: "ocean", label: "海洋", colors: ["#061827", "#0a263a", "#38bdf8"] },
+  { id: "forest", label: "森林", colors: ["#071710", "#0d2419", "#34d399"] },
+  { id: "amber", label: "琥珀", colors: ["#1b1206", "#2a1b09", "#f59e0b"] },
+  { id: "custom", label: "自定义", colors: ["#101827", "#1f2937", "#f472b6"] },
+];
 
 export function SettingsPage() {
   const settings = useLauncherStore((state) => state.settings);
@@ -27,6 +40,14 @@ export function SettingsPage() {
   const [concurrency, setConcurrency] = useState(8);
   const [defaultJavaPath, setDefaultJavaPath] = useState<string | null>(null);
   const [microsoftClientId, setMicrosoftClientId] = useState("");
+  const [theme, setTheme] = useState<ThemeMode>("system");
+  const [customTheme, setCustomTheme] = useState<CustomThemeColors>({
+    accent: "#22d3ee",
+    background: "#07111f",
+    panel: "#0b1929",
+    text: "#e2e8f0",
+    muted: "#94a3b8",
+  });
   const [defaultMemoryMb, setDefaultMemoryMb] = useState(4096);
   const [gameWidth, setGameWidth] = useState(854);
   const [gameHeight, setGameHeight] = useState(480);
@@ -40,6 +61,14 @@ export function SettingsPage() {
     setConcurrency(settings.downloadConcurrency);
     setDefaultJavaPath(settings.defaultJavaPath ?? null);
     setMicrosoftClientId(settings.microsoftClientId ?? "");
+    setTheme(settings.theme ?? "system");
+    if (settings.customTheme) {
+      try {
+        setCustomTheme((current) => ({ ...current, ...JSON.parse(settings.customTheme!) }));
+      } catch {
+        // Keep defaults for invalid custom theme JSON.
+      }
+    }
     setDefaultMemoryMb(settings.defaultMemoryMb);
     setGameWidth(settings.gameWidth);
     setGameHeight(settings.gameHeight);
@@ -53,6 +82,8 @@ export function SettingsPage() {
         downloadMirror: mirror,
         downloadConcurrency: concurrency,
         microsoftClientId,
+        theme,
+        customTheme: JSON.stringify(customTheme),
         defaultMemoryMb,
         gameWidth,
         gameHeight,
@@ -74,6 +105,59 @@ export function SettingsPage() {
       />
 
       <div className="space-y-5">
+        <section className="glass-panel hover-lift rounded-[28px] p-5">
+          <div className="flex items-center gap-2">
+            <Palette size={17} className="text-cyan-300" />
+            <h2 className="text-sm font-semibold text-slate-200">主题</h2>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">选择预设主题，或启用自定义颜色。跟随系统会根据 Windows 的亮色/深色模式自动切换。</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {themePresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setTheme(preset.id)}
+                className={[
+                  "rounded-2xl border p-3 text-left transition",
+                  theme === preset.id ? "border-cyan-300/30 bg-cyan-300/[0.08]" : "border-white/8 bg-slate-950/30 hover:border-white/15",
+                ].join(" ")}
+              >
+                <div className="flex gap-1.5">
+                  {preset.colors.map((color) => (
+                    <span key={color} className="h-4 w-4 rounded-full border border-white/20" style={{ background: color }} />
+                  ))}
+                </div>
+                <div className="mt-3 text-xs font-medium text-slate-200">{preset.label}</div>
+              </button>
+            ))}
+          </div>
+
+          {theme === "custom" ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {([
+                ["accent", "强调色"],
+                ["background", "背景色"],
+                ["panel", "面板色"],
+                ["text", "文字色"],
+                ["muted", "次要文字"],
+              ] as const).map(([key, label]) => (
+                <label key={key} className="block">
+                  <span className="text-xs text-slate-500">{label}</span>
+                  <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/50 p-2">
+                    <input
+                      type="color"
+                      value={customTheme[key]}
+                      onChange={(event) => setCustomTheme((current) => ({ ...current, [key]: event.currentTarget.value }))}
+                      className="h-8 w-10 rounded border-0 bg-transparent p-0"
+                    />
+                    <span className="font-mono text-[10px] text-slate-500">{customTheme[key]}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
         <section className="glass-panel hover-lift rounded-[28px] p-5">
           <div className="flex items-center gap-2">
             <Globe2 size={17} className="text-cyan-300" />

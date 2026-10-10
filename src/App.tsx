@@ -3,10 +3,12 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ArrowLeftRight, X } from "lucide-react";
 import { api } from "./api/tauri";
 import { Layout } from "./components/Layout";
+import { ThemeManager } from "./components/ThemeManager";
 import { InstanceDetail } from "./pages/InstanceDetail";
 import { Instances } from "./pages/Instances";
 import { CreateInstance } from "./pages/CreateInstance";
 import { CommunityMods } from "./pages/CommunityMods";
+import { CommunityModDetail } from "./pages/CommunityModDetail";
 import { ConflictReport } from "./pages/ConflictReport";
 import { BuildTimeline } from "./pages/BuildTimeline";
 import { ProjectDetail } from "./pages/ProjectDetail";
@@ -111,12 +113,14 @@ function App() {
 
   return (
     <HashRouter>
+      <ThemeManager />
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/instances" replace />} />
           <Route path="/instances" element={<Instances />} />
           <Route path="/instances/create" element={<CreateInstance />} />
           <Route path="/instances/:id/community" element={<CommunityMods />} />
+          <Route path="/instances/:id/community-detail" element={<CommunityModDetail />} />
           <Route path="/instances/:id/conflicts" element={<ConflictReport />} />
           <Route path="/instances/:id" element={<InstanceDetail />} />
           <Route path="/projects" element={<Projects />} />

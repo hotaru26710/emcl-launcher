@@ -22,7 +22,24 @@ body,
   background: transparent;
 }
 
+:root {
+  --theme-accent: #22d3ee;
+  --theme-bg: #07111f;
+  --theme-panel: #0b1929;
+  --theme-panel-soft: rgba(15, 23, 42, 0.72);
+  --theme-text: #e2e8f0;
+  --theme-text-strong: #ffffff;
+  --theme-muted: #94a3b8;
+  --theme-border: rgba(255, 255, 255, 0.09);
+  --theme-control: rgba(15, 23, 42, 0.55);
+}
+
 body {
+  color: var(--theme-text);
+  background:
+    radial-gradient(circle at 78% -10%, color-mix(in srgb, var(--theme-accent) 14%, transparent), transparent 34%),
+    radial-gradient(circle at 8% 100%, rgba(59, 130, 246, 0.08), transparent 38%),
+    var(--theme-bg);
   min-width: 960px;
   min-height: 640px;
   overflow: hidden;
@@ -222,4 +239,64 @@ textarea:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+.app-shell {
+  background: var(--theme-bg);
+  border-color: var(--theme-border);
+}
+
+.glass-panel {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--theme-panel) 86%, white 14%), var(--theme-panel)),
+    var(--theme-panel);
+  border-color: var(--theme-border);
+}
+
+html[data-theme="light"] .app-shell,
+html[data-theme="pink"] .app-shell,
+html[data-theme="custom"] .app-shell {
+  color: var(--theme-text);
+}
+
+html[data-theme="light"] .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300),
+html[data-theme="pink"] .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300),
+html[data-theme="custom"] .app-shell :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300) {
+  color: var(--theme-text-strong) !important;
+}
+
+html[data-theme="light"] .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700),
+html[data-theme="pink"] .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700),
+html[data-theme="custom"] .app-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700) {
+  color: var(--theme-muted) !important;
+}
+
+html[data-theme="light"] .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]),
+html[data-theme="pink"] .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]),
+html[data-theme="custom"] .app-shell :is(.bg-slate-950\/30, .bg-slate-950\/35, .bg-slate-950\/40, .bg-slate-950\/45, .bg-slate-950\/55, .bg-white\/5, .bg-white\/[0.02], .bg-white\/[0.025]) {
+  background-color: var(--theme-control) !important;
+}
+
+html[data-theme="light"] .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]),
+html[data-theme="pink"] .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]),
+html[data-theme="custom"] .app-shell :is(.border-white\/8, .border-white\/10, .border-white\/[0.06], .border-white\/[0.07], .border-white\/[0.09]) {
+  border-color: var(--theme-border) !important;
+}
+
+html[data-theme="light"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300),
+html[data-theme="pink"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300),
+html[data-theme="custom"] .app-shell :is(.from-cyan-400, .bg-cyan-400, .from-cyan-300, .bg-cyan-300) {
+  background-color: var(--theme-accent) !important;
+}
+
+.app-header {
+  background: var(--theme-panel-soft);
+  color: var(--theme-text);
+}
+
+html[data-theme="light"] .app-header :is(.text-slate-500, .text-slate-600),
+html[data-theme="pink"] .app-header :is(.text-slate-500, .text-slate-600),
+html[data-theme="custom"] .app-header :is(.text-slate-500, .text-slate-600) {
+  color: var(--theme-muted) !important;
 }

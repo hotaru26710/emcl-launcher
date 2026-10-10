@@ -6,7 +6,7 @@ import { WindowControls } from "./WindowControls";
 export function Layout() {
   return (
     <div className="h-screen w-screen p-2.5">
-      <div className="relative flex h-full overflow-hidden rounded-[30px] border border-white/[0.09] bg-[#07111f] shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
+      <div className="relative flex h-full overflow-hidden rounded-[30px] border border-white/[0.09] app-shell shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="animate-drift absolute -right-24 -top-28 h-96 w-96 rounded-full bg-cyan-400/[0.075] blur-3xl" />
           <div
@@ -18,7 +18,7 @@ export function Layout() {
 
         <Sidebar />
         <main className="relative z-10 flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 shrink-0 items-center border-b border-white/[0.055] bg-[#07111f]/62 backdrop-blur-xl">
+          <header className="flex h-16 shrink-0 items-center border-b border-white/[0.055] app-header backdrop-blur-xl">
             <div
               data-tauri-drag-region="true"
               className="flex h-full min-w-0 flex-1 items-center gap-3 px-7"

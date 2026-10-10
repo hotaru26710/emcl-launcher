@@ -123,6 +123,8 @@ fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow
         .clamp(1, 16);
     let default_java_path = get_setting(connection, "default_java_path")?;
     let microsoft_client_id = get_setting(connection, "microsoft_client_id")?;
+    let theme = get_setting(connection, "theme")?.unwrap_or_else(|| "system".to_string());
+    let custom_theme = get_setting(connection, "custom_theme_json")?;
     let default_memory_mb = get_setting(connection, "default_memory_mb")?
         .unwrap_or_else(|| "4096".to_string())
         .parse::<u32>()
@@ -147,6 +149,8 @@ fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow
         download_concurrency: concurrency,
         default_java_path,
         microsoft_client_id,
+        theme,
+        custom_theme,
         default_memory_mb,
         game_width,
         game_height,

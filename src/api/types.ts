@@ -216,12 +216,24 @@ export interface Settings {
   downloadConcurrency: number;
   defaultJavaPath?: string | null;
   microsoftClientId?: string | null;
+  theme: ThemeMode;
+  customTheme?: string | null;
   defaultMemoryMb: number;
   gameWidth: number;
   gameHeight: number;
   fullscreen: boolean;
   sharedDirectory: string;
   dataDirectory: string;
+}
+
+export type ThemeMode = "system" | "dark" | "light" | "pink" | "ocean" | "forest" | "amber" | "custom";
+
+export interface CustomThemeColors {
+  accent: string;
+  background: string;
+  panel: string;
+  text: string;
+  muted: string;
 }
 
 export type LoaderType = "fabric" | "quilt" | "neoforge" | "forge";
@@ -428,6 +440,8 @@ export interface UpdateSettingsInput {
   downloadMirror?: string;
   downloadConcurrency?: number;
   microsoftClientId?: string;
+  theme?: ThemeMode;
+  customTheme?: string;
   defaultMemoryMb?: number;
   gameWidth?: number;
   gameHeight?: number;

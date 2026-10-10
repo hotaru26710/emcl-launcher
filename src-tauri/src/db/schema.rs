@@ -186,6 +186,7 @@ fn seed_settings(connection: &Connection) -> Result<()> {
         ("game_width", "854"),
         ("game_height", "480"),
         ("fullscreen", "false"),
+        ("theme", "system"),
     ] {
         connection.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?1, ?2)",
