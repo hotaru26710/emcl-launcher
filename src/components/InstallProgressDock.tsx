@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Download, X } from "lucide-react";
+import { AlertCircle, BrainCircuit, CheckCircle2, Download, X } from "lucide-react";
 import type { InstallProgress } from "../api/types";
 import { useLauncherStore } from "../stores/launcher";
 
@@ -57,15 +57,19 @@ function ProgressItem({ progress }: { progress: InstallProgress }) {
 
 export function InstallProgressDock() {
   const installProgress = useLauncherStore((state) => state.installProgress);
+  const crashProgress = useLauncherStore((state) => state.crashAnalysisProgress);
+  const clearCrashAnalysisProgress = useLauncherStore((state) => state.clearCrashAnalysisProgress);
   const jobs = Object.values(installProgress).sort((left, right) => {
     if (left.status === "running" && right.status !== "running") return -1;
     if (left.status !== "running" && right.status === "running") return 1;
     return 0;
   });
-  const activeCount = jobs.filter((job) => job.status === "running").length;
+  const activeCount =
+    jobs.filter((job) => job.status === "running").length +
+    (crashProgress?.status === "running" ? 1 : 0);
   const latest = jobs[0];
 
-  if (jobs.length === 0) return null;
+  if (jobs.length === 0 && !crashProgress) return null;
 
   return (
     <div className="group/progress relative mt-auto mb-2 rounded-2xl border border-cyan-300/[0.09] bg-cyan-300/[0.035] p-1.5 transition-all duration-300 group-hover/sidebar:p-2.5">
@@ -88,7 +92,7 @@ export function InstallProgressDock() {
 
       <div className="max-h-0 overflow-hidden opacity-0 transition-all duration-300 group-hover/sidebar:max-h-72 group-hover/sidebar:opacity-100">
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
-          <span className="text-[10px] font-semibold tracking-[0.12em] text-slate-300">下载与安装</span>
+          <span className="text-[10px] font-semibold tracking-[0.12em] text-slate-300">任务与进度</span>
           <span className="rounded-full bg-cyan-300/10 px-1.5 py-0.5 text-[9px] text-cyan-200">
             {activeCount > 0 ? `${activeCount} 项进行中` : "最近任务"}
           </span>
@@ -97,6 +101,21 @@ export function InstallProgressDock() {
           {jobs.map((progress) => (
             <ProgressItem key={progress.jobId} progress={progress} />
           ))}
+          {crashProgress ? (
+            <div className="rounded-xl bg-black/[0.12] px-2.5 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <BrainCircuit className="shrink-0 text-cyan-200" size={14} />
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-200">{crashProgress.message}</span>
+                <span className="shrink-0 text-[10px] tabular-nums text-slate-400">{crashProgress.percent.toFixed(0)}%</span>
+                {crashProgress.status !== "running" ? (
+                  <button type="button" onClick={clearCrashAnalysisProgress} className="grid h-5 w-5 place-items-center rounded-full text-slate-500 transition hover:bg-white/10 hover:text-white" aria-label="关闭分析进度"><X size={12} /></button>
+                ) : null}
+              </div>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-950/60">
+                <div className="progress-sheen h-full rounded-full bg-gradient-to-r from-violet-400 to-cyan-300 transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, crashProgress.percent))}%` }} />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

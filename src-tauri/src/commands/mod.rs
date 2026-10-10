@@ -1,6 +1,7 @@
 pub mod app;
 pub mod auth;
 pub mod community;
+pub mod crash;
 pub mod github;
 pub mod install;
 pub mod instance;

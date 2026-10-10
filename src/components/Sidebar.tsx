@@ -1,5 +1,6 @@
 import {
   Boxes,
+  FileWarning,
   FolderGit2,
   Gamepad2,
   LogIn,
@@ -12,6 +13,7 @@ import { InstallProgressDock } from "./InstallProgressDock";
 const navigation = [
   { to: "/instances", label: "实例", hint: "INSTANCES", icon: Gamepad2 },
   { to: "/versions", label: "版本", hint: "VERSIONS", icon: Boxes },
+  { to: "/crash-reports", label: "错误报告", hint: "CRASH REPORTS", icon: FileWarning },
   { to: "/projects", label: "工程", hint: "PROJECTS", icon: FolderGit2 },
   { to: "/settings", label: "设置", hint: "SETTINGS", icon: Settings },
   { to: "/login", label: "账户", hint: "ACCOUNTS", icon: LogIn },

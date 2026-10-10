@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { ArrowLeftRight, X } from "lucide-react";
 import { api } from "./api/tauri";
 import { Layout } from "./components/Layout";
@@ -10,6 +10,7 @@ import { CreateInstance } from "./pages/CreateInstance";
 import { CommunityMods } from "./pages/CommunityMods";
 import { CommunityModDetail } from "./pages/CommunityModDetail";
 import { ConflictReport } from "./pages/ConflictReport";
+import { CrashReports } from "./pages/CrashReports";
 import { BuildTimeline } from "./pages/BuildTimeline";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import { Projects } from "./pages/Projects";
@@ -74,6 +75,36 @@ function GlobalError() {
   );
 }
 
+function CrashEventBridge() {
+  const navigate = useNavigate();
+  const setCrashAnalysisProgress = useLauncherStore((state) => state.setCrashAnalysisProgress);
+  const setCrashReportReady = useLauncherStore((state) => state.setCrashReportReady);
+
+  useEffect(() => {
+    let disposed = false;
+    const unlisteners: Array<() => void> = [];
+    const register = (listener: Promise<() => void>) => {
+      void listener.then((stopListening) => {
+        if (disposed) stopListening();
+        else unlisteners.push(stopListening);
+      });
+    };
+    register(api.onCrashAnalysisProgress(setCrashAnalysisProgress));
+    register(
+      api.onCrashReportReady((event) => {
+        setCrashReportReady(event);
+        navigate("/crash-reports");
+      }),
+    );
+    return () => {
+      disposed = true;
+      unlisteners.forEach((stopListening) => stopListening());
+    };
+  }, [navigate, setCrashAnalysisProgress, setCrashReportReady]);
+
+  return null;
+}
+
 function App() {
   const initialize = useLauncherStore((state) => state.initialize);
   const setInstallProgress = useLauncherStore((state) => state.setInstallProgress);
@@ -114,6 +145,7 @@ function App() {
   return (
     <HashRouter>
       <ThemeManager />
+      <CrashEventBridge />
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/instances" replace />} />
@@ -122,6 +154,7 @@ function App() {
           <Route path="/instances/:id/community" element={<CommunityMods />} />
           <Route path="/instances/:id/community-detail" element={<CommunityModDetail />} />
           <Route path="/instances/:id/conflicts" element={<ConflictReport />} />
+          <Route path="/crash-reports" element={<CrashReports />} />
           <Route path="/instances/:id" element={<InstanceDetail />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />

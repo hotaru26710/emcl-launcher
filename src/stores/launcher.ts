@@ -3,6 +3,8 @@ import { api, errorMessage } from "../api/tauri";
 import type {
   AccountSummary,
   CreateInstanceInput,
+  CrashAnalysisProgress,
+  CrashReportReady,
   DependencyRepairResult,
   InstallProgress,
   Instance,
@@ -32,6 +34,8 @@ interface LauncherStore {
   savingSettings: boolean;
   activeInstall: ActiveInstall | null;
   installProgress: Record<string, InstallProgress>;
+  crashAnalysisProgress: CrashAnalysisProgress | null;
+  crashReportReady: CrashReportReady | null;
   lastError: string | null;
   initialize: () => Promise<void>;
   refreshInstances: () => Promise<void>;
@@ -58,6 +62,10 @@ interface LauncherStore {
   appendLaunchLog: (log: LaunchLog) => void;
   setInstanceRunning: (instanceId: string, running: boolean) => void;
   setInstallProgress: (progress: InstallProgress) => void;
+  setCrashAnalysisProgress: (progress: CrashAnalysisProgress) => void;
+  clearCrashAnalysisProgress: () => void;
+  setCrashReportReady: (event: CrashReportReady) => void;
+  clearCrashReportReady: () => void;
   removeInstallProgress: (jobId: string) => void;
   clearActiveInstall: () => void;
   clearError: () => void;
@@ -86,6 +94,8 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
   savingSettings: false,
   activeInstall: null,
   installProgress: {},
+  crashAnalysisProgress: null,
+  crashReportReady: null,
   lastError: null,
 
   initialize: async () => {
@@ -474,6 +484,14 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
       }, 5000);
     }
   },
+
+  setCrashAnalysisProgress: (progress) => set({ crashAnalysisProgress: progress }),
+
+  clearCrashAnalysisProgress: () => set({ crashAnalysisProgress: null }),
+
+  setCrashReportReady: (event) => set({ crashReportReady: event }),
+
+  clearCrashReportReady: () => set({ crashReportReady: null }),
 
   removeInstallProgress: (jobId) =>
     set((state) => {

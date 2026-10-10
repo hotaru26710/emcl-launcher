@@ -28,6 +28,67 @@ export interface CrashAnalysis {
   suggestion: string;
 }
 
+export interface CrashAnalysisProgress {
+  jobId: string;
+  status: "running" | "complete" | "error" | string;
+  stage: string;
+  message: string;
+  percent: number;
+  instanceId?: string | null;
+}
+
+export interface CrashGameContext {
+  minecraftVersion?: string | null;
+  loader?: string | null;
+  loaderVersion?: string | null;
+  javaVersion?: string | null;
+  operatingSystem?: string | null;
+}
+
+export interface CrashFinding {
+  category: string;
+  title: string;
+  severity: string;
+  confidence: number;
+  evidence: string[];
+  explanation: string;
+  suggestion: string;
+}
+
+export interface SuspectMod {
+  modId: string;
+  name: string;
+  version?: string | null;
+  score: number;
+  confidence: string;
+  reasons: string[];
+}
+
+export interface CrashAnalysisReport {
+  id: string;
+  source: string;
+  archivePath: string;
+  instanceId?: string | null;
+  instanceName?: string | null;
+  createdAt: string;
+  severity: string;
+  summary: string;
+  confidence: number;
+  game: CrashGameContext;
+  findings: CrashFinding[];
+  suspectedMods: SuspectMod[];
+  recommendations: string[];
+  evidence: string[];
+  includedFiles: string[];
+  analyzedLines: number;
+}
+
+export interface CrashReportReady {
+  instanceId: string;
+  archivePath: string;
+  report: CrashAnalysisReport;
+}
+
 export interface DependencyRepairResult {
   installed: string[];
   failed: string[];

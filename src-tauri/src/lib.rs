@@ -2,7 +2,7 @@ mod commands;
 mod core;
 mod db;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -12,6 +12,7 @@ use core::paths::LauncherPaths;
 use db::schema;
 use reqwest::Client;
 use rusqlite::Connection;
+use std::sync::Arc;
 use tauri::Manager;
 
 pub struct AppState {
@@ -19,6 +20,7 @@ pub struct AppState {
     pub http: Client,
     pub paths: LauncherPaths,
     pub processes: ProcessRegistry,
+    pub intentional_stops: Arc<Mutex<HashSet<String>>>,
     pub watchers: Mutex<HashMap<String, notify::RecommendedWatcher>>,
 }
 
@@ -40,6 +42,7 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
         http,
         paths,
         processes: ProcessRegistry::default(),
+        intentional_stops: Arc::new(Mutex::new(HashSet::new())),
         watchers: Mutex::new(HashMap::new()),
     });
 
@@ -121,6 +124,10 @@ pub fn run() {
             commands::project::start_project_watcher,
             commands::project::stop_project_watcher,
             commands::project::analyze_crash_log,
+            commands::crash::analyze_crash_archive,
+            commands::crash::list_crash_reports,
+            commands::crash::get_crash_report,
+            commands::crash::delete_crash_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

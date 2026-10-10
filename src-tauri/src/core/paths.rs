@@ -54,6 +54,10 @@ impl LauncherPaths {
         self.root.join("logs")
     }
 
+    pub fn crash_reports_dir(&self) -> PathBuf {
+        self.root.join("crash-reports")
+    }
+
     pub fn database_file(&self) -> PathBuf {
         self.root.join("launcher.db")
     }
@@ -67,6 +71,7 @@ impl LauncherPaths {
             self.assets_dir(),
             self.instances_dir(),
             self.logs_dir(),
+            self.crash_reports_dir(),
         ] {
             std::fs::create_dir_all(&path)
                 .with_context(|| format!("failed to create {}", path.display()))?;

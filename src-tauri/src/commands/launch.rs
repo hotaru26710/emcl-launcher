@@ -66,6 +66,7 @@ pub async fn launch_instance(
     let result = launch::launch_instance(LaunchRequest {
         app: app.clone(),
         registry: state.processes.clone(),
+        intentional_stops: state.intentional_stops.clone(),
         instance: instance.clone(),
         details,
         paths: &state.paths,
@@ -92,7 +93,8 @@ pub async fn launch_instance(
 
 #[tauri::command]
 pub fn stop_instance(state: State<'_, AppState>, instance_id: String) -> Result<(), String> {
-    launch::stop_instance(&state.processes, &instance_id).map_err(|error| error.to_string())
+    launch::stop_instance(&state.processes, &state.intentional_stops, &instance_id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

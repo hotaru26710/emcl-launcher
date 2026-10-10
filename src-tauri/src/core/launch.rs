@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
@@ -13,12 +13,14 @@ use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
+use crate::core::crash::{self, AnalysisContext, CrashAnalysisProgress, CrashReportReady};
 use crate::core::install::rules_allow;
 use crate::core::paths::LauncherPaths;
 use crate::core::version::{Argument, VersionDetails};
 use crate::db::models::{Instance, Settings, StoredAccount};
 
 pub type ProcessRegistry = Arc<Mutex<HashMap<String, Arc<Mutex<Child>>>>>;
+pub type StopRegistry = Arc<Mutex<HashSet<String>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,6 +215,7 @@ pub fn build_command(
 pub struct LaunchRequest<'a> {
     pub app: AppHandle,
     pub registry: ProcessRegistry,
+    pub intentional_stops: StopRegistry,
     pub instance: Instance,
     pub details: VersionDetails,
     pub paths: &'a LauncherPaths,
@@ -225,6 +228,7 @@ pub async fn launch_instance(request: LaunchRequest<'_>) -> Result<LaunchResult>
     let LaunchRequest {
         app,
         registry,
+        intentional_stops,
         instance,
         details,
         paths,
@@ -275,6 +279,9 @@ pub async fn launch_instance(request: LaunchRequest<'_>) -> Result<LaunchResult>
     }
 
     let waiter_registry = registry.clone();
+    let waiter_stops = intentional_stops.clone();
+    let waiter_instance = instance.clone();
+    let waiter_paths = paths.clone();
     let waiter_instance_id = instance.id.clone();
     tokio::spawn(async move {
         let status = loop {
@@ -293,15 +300,104 @@ pub async fn launch_instance(request: LaunchRequest<'_>) -> Result<LaunchResult>
         if let Ok(mut registry) = waiter_registry.lock() {
             registry.remove(&waiter_instance_id);
         }
+        let intentional = waiter_stops
+            .lock()
+            .ok()
+            .map(|mut stops| stops.remove(&waiter_instance_id))
+            .unwrap_or(false);
         let code = status.code();
+        let crashed = !status.success() && !intentional;
         let _ = app.emit(
             "launch-exit",
             LaunchExit {
-                instance_id: waiter_instance_id,
+                instance_id: waiter_instance_id.clone(),
                 code,
-                success: status.success(),
+                success: status.success() || intentional,
             },
         );
+
+        if crashed {
+            tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+            let progress_app = app.clone();
+            let ready_app = app.clone();
+            let job_id = format!("crash-analysis-{}", uuid::Uuid::new_v4());
+            let progress_instance_id = waiter_instance_id.clone();
+            let progress_job_id = job_id.clone();
+            let report_instance = waiter_instance.clone();
+            let result = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+                let emit_progress = |stage: &str, message: &str, percent: f64| {
+                    let _ = progress_app.emit(
+                        "crash-analysis-progress",
+                        CrashAnalysisProgress {
+                            job_id: progress_job_id.clone(),
+                            status: if stage == "complete" {
+                                "complete".to_string()
+                            } else {
+                                "running".to_string()
+                            },
+                            stage: stage.to_string(),
+                            message: message.to_string(),
+                            percent,
+                            instance_id: Some(progress_instance_id.clone()),
+                        },
+                    );
+                };
+                let archive = crash::capture_crash_archive(
+                    &waiter_paths,
+                    &report_instance,
+                    code,
+                    &emit_progress,
+                )?;
+                let report = crash::analyze_crash_archive(
+                    &archive,
+                    AnalysisContext::from_instance(&report_instance, "auto"),
+                    &emit_progress,
+                )?;
+                crash::save_crash_report(&waiter_paths, &report)?;
+                emit_progress("complete", "错误报告分析完成", 100.0);
+                Ok((archive, report))
+            })
+            .await;
+
+            match result {
+                Ok(Ok((archive, report))) => {
+                    let _ = ready_app.emit(
+                        "crash-report-ready",
+                        CrashReportReady {
+                            instance_id: waiter_instance_id,
+                            archive_path: archive.to_string_lossy().into_owned(),
+                            report,
+                        },
+                    );
+                }
+                Ok(Err(error)) => {
+                    let _ = ready_app.emit(
+                        "crash-analysis-progress",
+                        CrashAnalysisProgress {
+                            job_id,
+                            status: "error".to_string(),
+                            stage: "error".to_string(),
+                            message: error.to_string(),
+                            percent: 0.0,
+                            instance_id: Some(waiter_instance_id),
+                        },
+                    );
+                }
+                Err(error) => {
+                    let _ = ready_app.emit(
+                        "crash-analysis-progress",
+                        CrashAnalysisProgress {
+                            job_id,
+                            status: "error".to_string(),
+                            stage: "error".to_string(),
+                            message: error.to_string(),
+                            percent: 0.0,
+                            instance_id: Some(waiter_instance_id),
+                        },
+                    );
+                }
+            }
+        }
     });
 
     Ok(LaunchResult {
@@ -310,13 +406,21 @@ pub async fn launch_instance(request: LaunchRequest<'_>) -> Result<LaunchResult>
     })
 }
 
-pub fn stop_instance(registry: &ProcessRegistry, instance_id: &str) -> Result<()> {
+pub fn stop_instance(
+    registry: &ProcessRegistry,
+    intentional_stops: &StopRegistry,
+    instance_id: &str,
+) -> Result<()> {
     let process = registry
         .lock()
         .map_err(|error| anyhow::anyhow!("进程注册表不可用: {error}"))?
         .get(instance_id)
         .cloned()
         .context("这个实例没有正在运行的游戏进程")?;
+
+    if let Ok(mut stops) = intentional_stops.lock() {
+        stops.insert(instance_id.to_string());
+    }
 
     let pid = {
         let child = process

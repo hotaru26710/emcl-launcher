@@ -6,6 +6,9 @@ import type {
   CommunityInstallResult,
   ConflictFinding,
   CrashAnalysis,
+  CrashAnalysisReport,
+  CrashAnalysisProgress,
+  CrashReportReady,
   SearchMcimInput,
   McimCurseForgeSearchResult,
   McimCurseForgeFile,
@@ -116,6 +119,12 @@ export const api = {
     invoke<void>("stop_project_watcher", { projectId }),
   analyzeCrashLog: (instanceId: string) =>
     invoke<CrashAnalysis>("analyze_crash_log", { instanceId }),
+  analyzeCrashArchive: (path: string, jobId: string, instanceId?: string | null) =>
+    invoke<CrashAnalysisReport>("analyze_crash_archive", { path, jobId, instanceId }),
+  listCrashReports: () => invoke<CrashAnalysisReport[]>("list_crash_reports"),
+  getCrashReport: (id: string) =>
+    invoke<CrashAnalysisReport>("get_crash_report", { id }),
+  deleteCrashReport: (id: string) => invoke<void>("delete_crash_report", { id }),
   setActiveAccount: (id: string) => invoke<void>("set_active_account", { id }),
   getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
   startMicrosoftLogin: () => invoke<DeviceCodeResponse>("start_microsoft_login"),
@@ -161,6 +170,10 @@ export const api = {
     invoke<boolean>("is_instance_running", { instanceId }),
   onInstallProgress: (callback: (progress: InstallProgress) => void): Promise<UnlistenFn> =>
     listen<InstallProgress>("install-progress", (event) => callback(event.payload)),
+  onCrashAnalysisProgress: (callback: (progress: CrashAnalysisProgress) => void): Promise<UnlistenFn> =>
+    listen<CrashAnalysisProgress>("crash-analysis-progress", (event) => callback(event.payload)),
+  onCrashReportReady: (callback: (event: CrashReportReady) => void): Promise<UnlistenFn> =>
+    listen<CrashReportReady>("crash-report-ready", (event) => callback(event.payload)),
   onLaunchLog: (callback: (log: LaunchLog) => void): Promise<UnlistenFn> =>
     listen<LaunchLog>("launch-log", (event) => callback(event.payload)),
   onLaunchExit: (callback: (exit: LaunchExit) => void): Promise<UnlistenFn> =>
