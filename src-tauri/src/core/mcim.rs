@@ -206,28 +206,33 @@ async fn install_recursive(
         .into_iter()
         .filter(|dependency| dependency.relation_type == 3)
     {
-        if let Ok(files) = get_curseforge_files(
+        let files = get_curseforge_files(
             client,
             dependency.mod_id,
             &instance.version_id,
             instance.loader.as_deref(),
         )
         .await
-        {
-            if let Some(file) = files.first() {
-                Box::pin(install_recursive(
-                    client,
-                    instance,
-                    dependency.mod_id,
-                    file.id,
-                    reporter,
-                    depth + 1,
-                    visited,
-                    result,
-                ))
-                .await?;
-            }
-        }
+        .with_context(|| format!("无法解析 CurseForge 依赖 {}", dependency.mod_id))?;
+        let dependency_file = files.first().with_context(|| {
+            format!(
+                "CurseForge 依赖 {} 没有适用于 {} / {} 的文件",
+                dependency.mod_id,
+                instance.version_id,
+                instance.loader.as_deref().unwrap_or("vanilla")
+            )
+        })?;
+        Box::pin(install_recursive(
+            client,
+            instance,
+            dependency.mod_id,
+            dependency_file.id,
+            reporter,
+            depth + 1,
+            visited,
+            result,
+        ))
+        .await?;
     }
     Ok(())
 }

@@ -116,6 +116,11 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
         initialized: true,
         initializing: false,
       });
+      window.setTimeout(() => {
+        void Promise.allSettled(
+          instances.map((instance) => api.checkModUpdates(instance.id)),
+        );
+      }, 1200);
     } catch (error) {
       set({
         initializing: false,

@@ -9,6 +9,8 @@ use crate::core::community;
 use crate::core::conflict::ConflictFinding;
 use crate::core::install::{self, ProgressReporter};
 use crate::core::instance as instance_core;
+use crate::core::mod_install;
+use crate::core::mod_search;
 use crate::core::mod_source::modrinth::ModrinthClient;
 use crate::core::mod_source::{ApiRouter, ModApiConfig, ProjectDetails, VersionInfo};
 use crate::AppState;
@@ -42,6 +44,7 @@ pub struct SearchModrinthInput {
 pub struct InstallModrinthInput {
     pub instance_id: String,
     pub version_id: String,
+    pub project_id: Option<String>,
 }
 
 #[tauri::command]
@@ -49,17 +52,33 @@ pub async fn search_modrinth_mods(
     state: State<'_, AppState>,
     input: SearchModrinthInput,
 ) -> Result<Vec<community::ModrinthSearchResult>, String> {
-    let client = modrinth_client(&state)?;
-    let hits = client
-        .search(&{
-            let mut request =
-                crate::core::mod_source::SearchRequest::new(input.query, input.game_version);
-            request.loader = input.loader;
-            request.offset = input.offset.unwrap_or(0);
-            request
-        })
-        .await
-        .map_err(|error| error.to_string())?;
+    let mut request = crate::core::mod_source::SearchRequest::new(input.query, input.game_version);
+    request.loader = input.loader;
+    request.offset = input.offset.unwrap_or(0);
+    let platform = crate::core::mod_source::ModPlatform::Modrinth;
+    let cache_key = mod_search::query_key(platform, &request);
+    let cached = {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_search::read_cache::<Vec<crate::core::mod_source::SearchHit>>(
+            &connection,
+            platform,
+            &cache_key,
+        )
+        .map_err(|error| error.to_string())?
+    };
+    let hits = if let Some(hits) = cached {
+        hits
+    } else {
+        let hits = modrinth_client(&state)?
+            .search(&request)
+            .await
+            .map_err(|error| error.to_string())?;
+        let hits = mod_search::rank_hits(hits);
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_search::write_cache(&connection, platform, &cache_key, &hits)
+            .map_err(|error| error.to_string())?;
+        hits
+    };
     Ok(hits
         .into_iter()
         .map(|hit| community::ModrinthSearchResult {
@@ -89,6 +108,10 @@ pub async fn get_modrinth_versions(
         .versions(&project_id, &game_version, loader.as_deref())
         .await
         .map_err(|error| error.to_string())?;
+    {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_search::cache_versions(&connection, &versions).map_err(|error| error.to_string())?;
+    }
     Ok(map_modrinth_versions(versions))
 }
 
@@ -97,10 +120,13 @@ pub async fn get_modrinth_project(
     state: State<'_, AppState>,
     project_id: String,
 ) -> Result<ProjectDetails, String> {
-    modrinth_client(&state)?
+    let project = modrinth_client(&state)?
         .project(&project_id)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    mod_search::cache_project(&connection, &project).map_err(|error| error.to_string())?;
+    Ok(project)
 }
 
 #[tauri::command]
@@ -108,10 +134,14 @@ pub async fn get_modrinth_version(
     state: State<'_, AppState>,
     version_id: String,
 ) -> Result<VersionInfo, String> {
-    modrinth_client(&state)?
+    let version = modrinth_client(&state)?
         .version(&version_id)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    mod_search::cache_versions(&connection, std::slice::from_ref(&version))
+        .map_err(|error| error.to_string())?;
+    Ok(version)
 }
 
 fn map_modrinth_versions(versions: Vec<VersionInfo>) -> Vec<community::ModrinthVersionInfo> {
@@ -166,7 +196,7 @@ pub async fn install_modrinth_version(
         let _ = event_handle.emit("install-progress", progress);
     });
     let reporter = ProgressReporter::new(job_id, instance.version_id.clone(), sink);
-    community::install_modrinth_version(
+    let result = community::install_modrinth_version(
         &state.http,
         &state.paths,
         &instance,
@@ -178,7 +208,22 @@ pub async fn install_modrinth_version(
         let message = error.to_string();
         reporter.fail(&message);
         message
-    })
+    })?;
+    {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_install::record_install_rooted(
+            &connection,
+            &instance,
+            "modrinth",
+            input.project_id.as_deref().unwrap_or(""),
+            Some(&input.version_id),
+            result.dependencies.first().map(String::as_str),
+            &result.mods,
+        )
+        .map_err(|error| error.to_string())?;
+        let _ = crate::core::conflict::check_instance_conflicts(&connection, &instance, None);
+    }
+    Ok(result)
 }
 
 #[tauri::command]

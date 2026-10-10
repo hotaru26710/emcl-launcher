@@ -396,6 +396,49 @@ export interface GitHubRelease {
   assets: GitHubAsset[];
 }
 
+export interface ModProjectDetails {
+  platform: "modrinth" | "curseforge" | string;
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  body: string;
+  iconUrl?: string | null;
+  author: string;
+  downloads: number;
+  follows: number;
+  categories: string[];
+  gameVersions: string[];
+  loaders: string[];
+  updatedAt: string;
+}
+
+export interface ModSourceVersionInfo {
+  platform: "modrinth" | "curseforge" | string;
+  projectId: string;
+  versionId: string;
+  name: string;
+  versionNumber: string;
+  gameVersions: string[];
+  loaders: string[];
+  releaseType: string;
+  publishedAt: string;
+  downloads: number;
+  files: Array<{
+    url: string;
+    fileName: string;
+    primary: boolean;
+    size: number;
+    sha1?: string | null;
+    sha512?: string | null;
+  }>;
+  dependencies: Array<{
+    projectId?: string | null;
+    versionId?: string | null;
+    dependencyType: string;
+  }>;
+}
+
 export interface ModrinthSearchResult {
   projectId: string;
   slug: string;
@@ -446,6 +489,35 @@ export interface SearchModrinthInput {
 export interface InstallModrinthInput {
   instanceId: string;
   versionId: string;
+  projectId?: string | null;
+}
+
+export interface InstalledMod {
+  instanceId: string;
+  modId: string;
+  modName?: string | null;
+  version?: string | null;
+  platform: string;
+  projectId: string;
+  versionId?: string | null;
+  fileName: string;
+  sha256: string;
+  sourceType: string;
+  updateAvailable: boolean;
+  latestVersionId?: string | null;
+  dependencyOf?: string | null;
+}
+
+export interface ModUpdate {
+  modId: string;
+  modName?: string | null;
+  fileName: string;
+  platform: string;
+  projectId: string;
+  currentVersion?: string | null;
+  latestVersion?: string | null;
+  latestVersionId: string;
+  updateAvailable: boolean;
 }
 
 export interface ModInfo {

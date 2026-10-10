@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink, GitBranch, Globe2, Package } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/tauri";
-import type { GitHubRelease, McimCurseForgeFile, ModrinthVersionInfo } from "../api/types";
+import type { GitHubRelease, McimCurseForgeFile, ModProjectDetails, ModrinthVersionInfo } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import type { UnifiedModEntry } from "./CommunityMods";
@@ -23,6 +23,7 @@ export function CommunityModDetail() {
   const [loader, setLoader] = useState<string | null>(null);
   const [modrinthVersions, setModrinthVersions] = useState<ModrinthVersionInfo[]>([]);
   const [mcimFiles, setMcimFiles] = useState<McimCurseForgeFile[]>([]);
+  const [projectDetails, setProjectDetails] = useState<ModProjectDetails | null>(null);
   const [githubReleases, setGithubReleases] = useState<GitHubRelease[]>([]);
   const [loading, setLoading] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
@@ -44,9 +45,11 @@ export function CommunityModDetail() {
     setMessage("");
     const tasks: Promise<unknown>[] = [];
     if (entry.modrinth) {
+      tasks.push(api.getModrinthProject(entry.modrinth.projectId).then(setProjectDetails).catch(() => undefined));
       tasks.push(api.getModrinthVersions(entry.modrinth.projectId, gameVersion, loader).then(setModrinthVersions).catch(() => undefined));
     }
     if (entry.mcim) {
+      tasks.push(api.getMcimCurseForgeProject(entry.mcim.id).then(setProjectDetails).catch(() => undefined));
       tasks.push(api.getMcimCurseForgeFiles(entry.mcim.id, gameVersion, loader).then(setMcimFiles).catch(() => undefined));
     }
     if (entry.github) {
@@ -63,7 +66,7 @@ export function CommunityModDetail() {
     if (!window.confirm("将安装这个 Modrinth 文件并自动处理必需依赖，是否继续？")) return;
     setInstalling(`mr-${version.id}`);
     try {
-      const result = await api.installModrinthVersion({ instanceId: id, versionId: version.id });
+      const result = await api.installModrinthVersion({ instanceId: id, versionId: version.id, projectId: entry.modrinth?.projectId });
       setMessage(`安装完成：新增 ${result.installed}，跳过 ${result.skipped}`);
     } catch (error) {
       setMessage(errorMessage(error));
@@ -110,6 +113,23 @@ export function CommunityModDetail() {
         {entry.tags.map((tag) => <StatusPill key={tag} tone="slate">{tag}</StatusPill>)}
       </div>
       {message ? <div className="mb-4 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.05] px-4 py-3 text-sm text-cyan-100">{message}</div> : null}
+
+      {projectDetails ? (
+        <section className="glass-panel mb-4 rounded-[28px] p-5">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-200">
+            <Package size={16} />
+            项目详情
+            {projectDetails.author ? <span className="text-xs font-normal text-slate-500">by {projectDetails.author}</span> : null}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500">
+            <span>{projectDetails.downloads.toLocaleString()} 次下载</span>
+            <span>·</span>
+            <span>{projectDetails.follows.toLocaleString()} 关注</span>
+            {projectDetails.loaders.length > 0 ? <span>· {projectDetails.loaders.join(", ")}</span> : null}
+          </div>
+          <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-400">{projectDetails.body || projectDetails.description}</p>
+        </section>
+      ) : null}
 
       {entry.modrinth ? (
         <section className="glass-panel mb-4 rounded-[28px] p-5">

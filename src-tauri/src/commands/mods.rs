@@ -1,6 +1,9 @@
 use tauri::State;
 
+use crate::commands::settings::load_settings;
 use crate::core::instance as instance_core;
+use crate::core::mod_install;
+use crate::core::mod_source::ModApiConfig;
 use crate::core::mods;
 use crate::db::models::Instance;
 use crate::AppState;
@@ -62,4 +65,53 @@ where
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "实例不存在".to_string())?;
     operation(&state.paths, &instance).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_installed_mods(
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<Vec<mod_install::InstalledMod>, String> {
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    let instance = instance_core::get_instance(&connection, &instance_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "实例不存在".to_string())?;
+    mod_install::sync_from_mods(&connection, &instance).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn check_mod_updates(
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<Vec<crate::core::mod_update::ModUpdate>, String> {
+    let settings = load_settings(&state)?;
+    let config = ModApiConfig {
+        force_official: settings.mod_api_mode == "official",
+        curseforge_api_key: settings.curseforge_api_key,
+    };
+    let (instance, installed) = {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        let instance = instance_core::get_instance(&connection, &instance_id)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "实例不存在".to_string())?;
+        let installed = mod_install::sync_from_mods(&connection, &instance)
+            .map_err(|error| error.to_string())?;
+        (instance, installed)
+    };
+    let updates = crate::core::mod_update::check_updates(&state.http, &instance, installed, config)
+        .await
+        .map_err(|error| error.to_string())?;
+    {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        for update in &updates {
+            mod_install::set_update(
+                &connection,
+                &instance.id,
+                &update.mod_id,
+                Some(&update.latest_version_id),
+            )
+            .map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(updates)
 }

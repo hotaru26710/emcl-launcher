@@ -11,6 +11,7 @@ import {
   Play,
   Power,
   PowerOff,
+  RefreshCw,
   Save,
   ShieldAlert,
   Square,
@@ -20,7 +21,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api } from "../api/tauri";
-import type { CrashAnalysis, Instance, JavaRecommendation, ModInfo } from "../api/types";
+import type { CrashAnalysis, Instance, InstalledMod, JavaRecommendation, ModInfo, ModUpdate } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
@@ -53,7 +54,11 @@ export function InstanceDetail() {
   const [recommendation, setRecommendation] = useState<JavaRecommendation | null>(null);
   const [detectingJava, setDetectingJava] = useState(false);
   const [mods, setMods] = useState<ModInfo[]>([]);
+  const [installedMods, setInstalledMods] = useState<InstalledMod[]>([]);
+  const [modUpdates, setModUpdates] = useState<ModUpdate[]>([]);
   const [loadingMods, setLoadingMods] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updatingMod, setUpdatingMod] = useState<string | null>(null);
   const [crashAnalysis, setCrashAnalysis] = useState<CrashAnalysis | null>(null);
   const [analyzingCrash, setAnalyzingCrash] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -120,10 +125,15 @@ export function InstanceDetail() {
     if (!instance?.id) return;
     let disposed = false;
     setLoadingMods(true);
-    void api
-      .listMods(instance.id)
-      .then((next) => {
-        if (!disposed) setMods(next);
+    void Promise.all([
+      api.listMods(instance.id),
+      api.listInstalledMods(instance.id),
+    ])
+      .then(([next, installed]) => {
+        if (!disposed) {
+          setMods(next);
+          setInstalledMods(installed);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
@@ -133,6 +143,24 @@ export function InstanceDetail() {
       disposed = true;
     };
   }, [instance?.id]);
+
+  useEffect(() => {
+    if (!instance?.id) return;
+    let disposed = false;
+    setCheckingUpdates(true);
+    void api
+      .checkModUpdates(instance.id)
+      .then((updates) => {
+        if (!disposed) setModUpdates(updates);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!disposed) setCheckingUpdates(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [instance?.id, instance?.versionId, instance?.loader]);
 
   useEffect(() => {
     if (!instance?.id) return;
@@ -172,6 +200,46 @@ export function InstanceDetail() {
     activeInstall?.instanceId === instance.id
       ? installProgress[activeInstall.jobId]
       : undefined;
+  const updatesByFileName = new Map(
+    modUpdates.map((update) => [update.fileName, update]),
+  );
+
+  const reloadMods = async () => {
+    const [nextMods, installedNext, updates] = await Promise.all([
+      api.listMods(instance.id),
+      api.listInstalledMods(instance.id),
+      api.checkModUpdates(instance.id),
+    ]);
+    setMods(nextMods);
+    setInstalledMods(installedNext);
+    setModUpdates(updates);
+  };
+
+  const installUpdate = async (mod: ModInfo) => {
+    const update = modUpdates.find((item) => item.fileName === mod.fileName);
+    if (!update) return;
+    setUpdatingMod(mod.fileName);
+    try {
+      if (update.platform === "modrinth") {
+        await api.installModrinthVersion({
+          instanceId: instance.id,
+          versionId: update.latestVersionId,
+          projectId: update.projectId,
+        });
+      } else if (update.platform === "curseforge") {
+        await api.installMcimCurseForgeFile({
+          instanceId: instance.id,
+          modId: Number(update.projectId),
+          fileId: Number(update.latestVersionId),
+        });
+      }
+      await reloadMods();
+    } catch {
+      // The shared error banner owns the message.
+    } finally {
+      setUpdatingMod(null);
+    }
+  };
 
   const save = async () => {
     if (!instance) return;
@@ -464,6 +532,21 @@ export function InstanceDetail() {
                   浏览社区模组
                 </Link>
                 <StatusPill tone={mods.length > 0 ? "cyan" : "slate"}>{`${mods.length} 个`}</StatusPill>
+                <button
+                  type="button"
+                  disabled={checkingUpdates}
+                  onClick={() => {
+                    setCheckingUpdates(true);
+                    void api
+                      .checkModUpdates(instance.id)
+                      .then(setModUpdates)
+                      .finally(() => setCheckingUpdates(false));
+                  }}
+                  className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-300 transition hover:bg-white/8 disabled:opacity-40"
+                  aria-label="检查模组更新"
+                >
+                  <RefreshCw size={13} className={checkingUpdates ? "animate-spin" : ""} />
+                </button>
               </div>
             </div>
             <div className="mt-3 rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.035] px-4 py-4 text-center text-xs leading-5 text-slate-500">
@@ -489,9 +572,23 @@ export function InstanceDetail() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-xs font-medium text-slate-200">{mod.name}</div>
                       <div className="mt-0.5 truncate font-mono text-[10px] text-slate-600">
-                        {[mod.version, mod.loader, mod.fileName].filter(Boolean).join(" · ")}
+                        {[mod.version, mod.loader, installedMods.find((item) => item.fileName === mod.fileName)?.platform, mod.fileName].filter(Boolean).join(" · ")}
                       </div>
+                      {updatesByFileName.get(mod.fileName) ? (
+                        <div className="mt-1 text-[10px] text-amber-300">可更新到 {updatesByFileName.get(mod.fileName)?.latestVersion || "新版本"}</div>
+                      ) : null}
                     </div>
+                    {updatesByFileName.get(mod.fileName) ? (
+                      <button
+                        type="button"
+                        disabled={updatingMod === mod.fileName}
+                        onClick={() => void installUpdate(mod)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-300/15 bg-amber-300/[0.07] px-2 py-1.5 text-[10px] font-medium text-amber-200 transition hover:bg-amber-300/[0.12] disabled:opacity-40"
+                      >
+                        <RefreshCw size={12} className={updatingMod === mod.fileName ? "animate-spin" : ""} />
+                        更新
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() =>

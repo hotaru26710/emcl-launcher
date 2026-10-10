@@ -28,10 +28,14 @@ import type {
   LoaderInstallResult,
   LoaderVersionInfo,
   ModInfo,
+  InstalledMod,
+  ModUpdate,
   ModMetadata,
   InstallModrinthInput,
   ModrinthSearchResult,
   ModrinthVersionInfo,
+  ModProjectDetails,
+  ModSourceVersionInfo,
   Project,
   ProjectBuildExit,
   ProjectBuildLog,
@@ -139,6 +143,10 @@ export const api = {
   getLoaderVersions: (loader: string, gameVersion: string) =>
     invoke<LoaderVersionInfo[]>("get_loader_versions", { loader, gameVersion }),
   listMods: (instanceId: string) => invoke<ModInfo[]>("list_mods", { instanceId }),
+  listInstalledMods: (instanceId: string) =>
+    invoke<InstalledMod[]>("list_installed_mods", { instanceId }),
+  checkModUpdates: (instanceId: string) =>
+    invoke<ModUpdate[]>("check_mod_updates", { instanceId }),
   installMods: (instanceId: string, paths: string[]) =>
     invoke<ModInfo[]>("install_mods", { instanceId, paths }),
   toggleMod: (instanceId: string, fileName: string, enabled: boolean) =>
@@ -149,6 +157,12 @@ export const api = {
     invoke<ModrinthSearchResult[]>("search_modrinth_mods", { input }),
   getModrinthVersions: (projectId: string, gameVersion: string, loader?: string | null) =>
     invoke<ModrinthVersionInfo[]>("get_modrinth_versions", { projectId, gameVersion, loader }),
+  getModrinthProject: (projectId: string) =>
+    invoke<ModProjectDetails>("get_modrinth_project", { projectId }),
+  getModrinthVersion: (versionId: string) =>
+    invoke<ModSourceVersionInfo>("get_modrinth_version", { versionId }),
+  getMcimCurseForgeProject: (modId: number) =>
+    invoke<ModProjectDetails>("get_mcim_curseforge_project", { modId }),
   installModrinthVersion: (input: InstallModrinthInput) =>
     invoke<CommunityInstallResult>("install_modrinth_version", { input }),
   searchGitHubMods: (query: string, offset?: number) =>

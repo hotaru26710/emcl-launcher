@@ -8,6 +8,8 @@ use crate::commands::settings::load_settings;
 use crate::core::install::{self, ProgressReporter};
 use crate::core::instance as instance_core;
 use crate::core::mcim;
+use crate::core::mod_install;
+use crate::core::mod_search;
 use crate::core::mod_source::curseforge::CurseForgeClient;
 use crate::core::mod_source::{ApiRouter, ModApiConfig, ProjectDetails, SearchRequest};
 use crate::AppState;
@@ -45,15 +47,33 @@ pub async fn search_mcim_curseforge_mods(
     state: State<'_, AppState>,
     input: SearchMcimInput,
 ) -> Result<Vec<mcim::McimCurseForgeSearchResult>, String> {
-    let hits = curseforge_client(&state)?
-        .search(&{
-            let mut request = SearchRequest::new(input.query, input.game_version);
-            request.loader = input.loader;
-            request.offset = input.offset.unwrap_or(0);
-            request
-        })
-        .await
-        .map_err(|error| error.to_string())?;
+    let mut request = SearchRequest::new(input.query, input.game_version);
+    request.loader = input.loader;
+    request.offset = input.offset.unwrap_or(0);
+    let platform = crate::core::mod_source::ModPlatform::CurseForge;
+    let cache_key = mod_search::query_key(platform, &request);
+    let cached = {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_search::read_cache::<Vec<crate::core::mod_source::SearchHit>>(
+            &connection,
+            platform,
+            &cache_key,
+        )
+        .map_err(|error| error.to_string())?
+    };
+    let hits = if let Some(hits) = cached {
+        hits
+    } else {
+        let hits = curseforge_client(&state)?
+            .search(&request)
+            .await
+            .map_err(|error| error.to_string())?;
+        let hits = mod_search::rank_hits(hits);
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_search::write_cache(&connection, platform, &cache_key, &hits)
+            .map_err(|error| error.to_string())?;
+        hits
+    };
     Ok(hits
         .into_iter()
         .filter_map(|hit| {
@@ -78,10 +98,13 @@ pub async fn get_mcim_curseforge_project(
     state: State<'_, AppState>,
     mod_id: u64,
 ) -> Result<ProjectDetails, String> {
-    curseforge_client(&state)?
+    let project = curseforge_client(&state)?
         .project(mod_id)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    mod_search::cache_project(&connection, &project).map_err(|error| error.to_string())?;
+    Ok(project)
 }
 
 #[tauri::command]
@@ -95,6 +118,10 @@ pub async fn get_mcim_curseforge_files(
         .files(mod_id, &game_version, loader.as_deref())
         .await
         .map_err(|error| error.to_string())?;
+    {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_search::cache_versions(&connection, &versions).map_err(|error| error.to_string())?;
+    }
     Ok(versions
         .into_iter()
         .filter_map(|version| {
@@ -138,7 +165,7 @@ pub async fn install_mcim_curseforge_file(
         let _ = event_handle.emit("install-progress", progress);
     });
     let reporter = ProgressReporter::new(job_id, instance.version_id.clone(), sink);
-    mcim::install_curseforge_file(
+    let result = mcim::install_curseforge_file(
         &state.http,
         &instance,
         input.mod_id,
@@ -150,5 +177,20 @@ pub async fn install_mcim_curseforge_file(
         let message = error.to_string();
         reporter.fail(&message);
         message
-    })
+    })?;
+    {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        mod_install::record_install_rooted(
+            &connection,
+            &instance,
+            "curseforge",
+            &input.mod_id.to_string(),
+            Some(&input.file_id.to_string()),
+            result.dependencies.first().map(String::as_str),
+            &result.mods,
+        )
+        .map_err(|error| error.to_string())?;
+        let _ = crate::core::conflict::check_instance_conflicts(&connection, &instance, None);
+    }
+    Ok(result)
 }
