@@ -53,9 +53,14 @@ pub fn build_command(
     java_path: &Path,
 ) -> Result<Command> {
     let version_dir = paths.version_dir(&details.id);
-    let client_jar = version_dir.join("client.jar");
+    let base_version_dir = paths.version_dir(&instance.version_id);
+    let client_jar = if instance.loader.is_some() {
+        base_version_dir.join("client.jar")
+    } else {
+        version_dir.join("client.jar")
+    };
     if !client_jar.is_file() {
-        bail!("客户端文件尚未安装，请先执行安装");
+        bail!("客户端文件尚未安装或路径不正确：{}", client_jar.display());
     }
 
     let mut classpath_entries = Vec::new();
@@ -78,7 +83,11 @@ pub fn build_command(
     let classpath_separator = if cfg!(windows) { ";" } else { ":" };
     let classpath = classpath_entries.join(classpath_separator);
 
-    let natives_directory = version_dir.join("natives");
+    let natives_directory = if instance.loader.is_some() {
+        base_version_dir.join("natives")
+    } else {
+        version_dir.join("natives")
+    };
     std::fs::create_dir_all(&natives_directory)?;
     let game_directory = PathBuf::from(&instance.directory);
     let assets_root = paths.assets_dir();
