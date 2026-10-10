@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, GitBranch, History, RefreshCw } from "lucide-react";
+import { ArrowLeft, GitBranch, History, Play, RefreshCw } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/tauri";
-import type { BuildArtifact, Project } from "../api/types";
+import type { BuildArtifact, LinkedProjectInstance, Project } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatBytes, formatDate } from "../lib/format";
@@ -11,6 +11,7 @@ export function BuildTimeline() {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [artifacts, setArtifacts] = useState<BuildArtifact[]>([]);
+  const [links, setLinks] = useState<LinkedProjectInstance[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -18,12 +19,14 @@ export function BuildTimeline() {
     if (!id) return;
     setLoading(true);
     try {
-      const [nextProject, nextArtifacts] = await Promise.all([
+      const [nextProject, nextArtifacts, nextLinks] = await Promise.all([
         api.getProject(id),
         api.listBuildArtifacts(id),
+        api.listProjectInstances(id),
       ]);
       setProject(nextProject);
       setArtifacts(nextArtifacts);
+      setLinks(nextLinks);
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {
@@ -34,6 +37,21 @@ export function BuildTimeline() {
   useEffect(() => {
     void refresh();
   }, [id]);
+
+  const deploy = async (artifactId: string) => {
+    const target = links[0];
+    if (!target) {
+      setMessage("请先在工程详情中绑定一个实例。");
+      return;
+    }
+    try {
+      await api.deployBuildArtifact(target.instanceId, artifactId);
+      setMessage(`已部署到 ${target.instanceName}。`);
+      await refresh();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  };
 
   return (
     <div className="animate-page mx-auto max-w-5xl">
@@ -92,6 +110,14 @@ export function BuildTimeline() {
                       </span>
                     ) : null}
                     {artifact.gitCommit ? <span className="font-mono">{artifact.gitCommit.slice(0, 8)}</span> : null}
+                    <button
+                      type="button"
+                      onClick={() => void deploy(artifact.id)}
+                      className="ml-auto inline-flex items-center gap-1 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1.5 text-cyan-200 transition hover:bg-cyan-300/[0.12]"
+                    >
+                      <Play size={12} />
+                      部署此版本
+                    </button>
                   </div>
                 </div>
               </div>

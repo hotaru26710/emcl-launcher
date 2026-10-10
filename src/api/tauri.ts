@@ -4,6 +4,9 @@ import type {
   AccountSummary,
   BuildArtifact,
   CommunityInstallResult,
+  ConflictFinding,
+  CrashAnalysis,
+  ConflictReport,
   CreateInstanceInput,
   CreateProjectInput,
   DeviceCodeResponse,
@@ -14,10 +17,13 @@ import type {
   LoaderInstallResult,
   LoaderVersionInfo,
   ModInfo,
+  ModMetadata,
   InstallModrinthInput,
   ModrinthSearchResult,
   ModrinthVersionInfo,
   Project,
+  ProjectBuildExit,
+  ProjectBuildLog,
   ProjectInspection,
   LinkedProjectInstance,
   SearchModrinthInput,
@@ -84,6 +90,22 @@ export const api = {
     invoke<BuildArtifact[]>("list_build_artifacts", { projectId }),
   getBuildArtifact: (id: string) =>
     invoke<BuildArtifact | null>("get_build_artifact", { id }),
+  runProjectBuild: (projectId: string) =>
+    invoke<BuildArtifact[]>("run_project_build", { projectId }),
+  deployBuildArtifact: (instanceId: string, artifactId: string) =>
+    invoke<ModInfo[]>("deploy_build_artifact", { instanceId, artifactId }),
+  checkInstanceConflicts: (instanceId: string, artifactId?: string | null) =>
+    invoke<ConflictFinding[]>("check_instance_conflicts", { instanceId, artifactId }),
+  listConflictReports: (instanceId: string) =>
+    invoke<ConflictReport[]>("list_conflict_reports", { instanceId }),
+  refreshInstanceModMetadata: (instanceId: string) =>
+    invoke<ModMetadata[]>("refresh_instance_mod_metadata", { instanceId }),
+  startProjectWatcher: (projectId: string) =>
+    invoke<void>("start_project_watcher", { projectId }),
+  stopProjectWatcher: (projectId: string) =>
+    invoke<void>("stop_project_watcher", { projectId }),
+  analyzeCrashLog: (instanceId: string) =>
+    invoke<CrashAnalysis>("analyze_crash_log", { instanceId }),
   setActiveAccount: (id: string) => invoke<void>("set_active_account", { id }),
   getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
   startMicrosoftLogin: () => invoke<DeviceCodeResponse>("start_microsoft_login"),
@@ -121,6 +143,10 @@ export const api = {
     listen<LaunchLog>("launch-log", (event) => callback(event.payload)),
   onLaunchExit: (callback: (exit: LaunchExit) => void): Promise<UnlistenFn> =>
     listen<LaunchExit>("launch-exit", (event) => callback(event.payload)),
+  onProjectBuildLog: (callback: (log: ProjectBuildLog) => void): Promise<UnlistenFn> =>
+    listen<ProjectBuildLog>("project-build-log", (event) => callback(event.payload)),
+  onProjectBuildExit: (callback: (exit: ProjectBuildExit) => void): Promise<UnlistenFn> =>
+    listen<ProjectBuildExit>("project-build-exit", (event) => callback(event.payload)),
 };
 
 export function errorMessage(error: unknown): string {

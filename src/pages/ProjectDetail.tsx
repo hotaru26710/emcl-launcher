@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   FolderGit2,
   Link2,
+  Play,
   ScanSearch,
   Trash2,
 } from "lucide-react";
@@ -22,6 +23,8 @@ export function ProjectDetail() {
   const [artifacts, setArtifacts] = useState<BuildArtifact[]>([]);
   const [selectedInstance, setSelectedInstance] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [buildLogs, setBuildLogs] = useState<string[]>([]);
   const [message, setMessage] = useState("");
 
   const refresh = async () => {
@@ -44,6 +47,32 @@ export function ProjectDetail() {
     void refresh();
   }, [id]);
 
+  useEffect(() => {
+    let disposed = false;
+    const unlisteners: Array<() => void> = [];
+    void api.onProjectBuildLog((log) => {
+      if (log.projectId === id) {
+        setBuildLogs((current) => [...current, `[${log.stream}] ${log.line}`].slice(-400));
+      }
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisteners.push(stop);
+    });
+    void api.onProjectBuildExit((exit) => {
+      if (exit.projectId === id) {
+        setBuilding(false);
+        if (!exit.success) setMessage(`构建失败，退出码 ${exit.code ?? "未知"}`);
+      }
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisteners.push(stop);
+    });
+    return () => {
+      disposed = true;
+      unlisteners.forEach((stop) => stop());
+    };
+  }, [id]);
+
   const scan = async () => {
     if (!id) return;
     setScanning(true);
@@ -56,6 +85,37 @@ export function ProjectDetail() {
       setMessage(errorMessage(error));
     } finally {
       setScanning(false);
+    }
+  };
+
+  const build = async () => {
+    if (!id) return;
+    setBuilding(true);
+    setBuildLogs([]);
+    setMessage("");
+    try {
+      const next = await api.runProjectBuild(id);
+      setArtifacts(next);
+      setMessage("构建完成，已刷新构建产物。");
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBuilding(false);
+    }
+  };
+
+  const deploy = async (artifactId: string) => {
+    const target = links[0];
+    if (!target) {
+      setMessage("请先绑定一个实例。");
+      return;
+    }
+    try {
+      await api.deployBuildArtifact(target.instanceId, artifactId);
+      setMessage(`已部署到 ${target.instanceName}。`);
+      await refresh();
+    } catch (error) {
+      setMessage(errorMessage(error));
     }
   };
 
@@ -98,15 +158,26 @@ export function ProjectDetail() {
         title={project.name}
         description="工程绑定与构建产物识别。后续步骤会在这里增加构建、部署和冲突检测。"
         action={
-          <button
-            type="button"
-            disabled={scanning}
-            onClick={() => void scan()}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/8 disabled:opacity-40"
-          >
-            <ScanSearch size={16} className={scanning ? "animate-spin" : ""} />
-            {scanning ? "扫描中..." : "扫描产物"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={building}
+              onClick={() => void build()}
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
+            >
+              <Play size={16} />
+              {building ? "构建中..." : "执行构建"}
+            </button>
+            <button
+              type="button"
+              disabled={scanning}
+              onClick={() => void scan()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 transition hover:bg-white/8 disabled:opacity-40"
+            >
+              <ScanSearch size={16} className={scanning ? "animate-spin" : ""} />
+              {scanning ? "扫描中..." : "扫描产物"}
+            </button>
+          </div>
         }
       />
 
@@ -221,16 +292,38 @@ export function ProjectDetail() {
                   </div>
                   <StatusPill tone="emerald">{artifact.status}</StatusPill>
                 </div>
-                <div className="mt-2 text-[10px] text-slate-600">
+                <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-slate-600">
+                  <span>
                   {formatDate(artifact.builtAt)}
                   {artifact.gitBranch ? ` · ${artifact.gitBranch}` : ""}
                   {artifact.gitCommit ? ` · ${artifact.gitCommit.slice(0, 8)}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void deploy(artifact.id)}
+                    className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1.5 text-cyan-200 transition hover:bg-cyan-300/[0.12]"
+                  >
+                    部署
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
       </section>
+
+      {buildLogs.length > 0 || building ? (
+        <section className="glass-panel mt-4 rounded-[28px] p-5">
+          <h2 className="text-sm font-semibold text-slate-200">Gradle 输出</h2>
+          <div className="mt-3 h-64 overflow-y-auto rounded-2xl border border-slate-800/80 bg-[#040914] p-3 font-mono text-[11px] leading-5 text-slate-400">
+            {buildLogs.length === 0 ? (
+              <div className="grid h-full place-items-center text-slate-700">等待构建输出...</div>
+            ) : (
+              buildLogs.map((line, index) => <div key={`${index}-${line}`}>{line}</div>)
+            )}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

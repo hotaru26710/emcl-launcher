@@ -1,3 +1,59 @@
+export interface ProjectBuildLog {
+  projectId: string;
+  stream: "stdout" | "stderr" | string;
+  line: string;
+  timestamp: string;
+}
+
+export interface ProjectBuildExit {
+  projectId: string;
+  success: boolean;
+  code?: number | null;
+}
+
+export interface ConflictFinding {
+  severity: string;
+  conflictType: string;
+  sourceModId?: string | null;
+  targetModId?: string | null;
+  detail: string;
+  suggestion: string;
+}
+
+export interface CrashAnalysis {
+  category: string;
+  summary: string;
+  severity: string;
+  matchedLines: string[];
+  suggestion: string;
+}
+
+export interface ConflictReport {
+  id: number;
+  instanceId: string;
+  severity: string;
+  conflictType: string;
+  sourceModId?: string | null;
+  targetModId?: string | null;
+  detail: string;
+  suggestion: string;
+  createdAt: string;
+}
+
+export interface ModMetadata {
+  instanceId: string;
+  modId?: string | null;
+  modName?: string | null;
+  version?: string | null;
+  loader?: string | null;
+  fileName: string;
+  sha256: string;
+  sourceType: string;
+  dependsJson: string;
+  breaksJson: string;
+  conflictsJson: string;
+}
+
 export interface VersionManifest {
   latest: {
     release: string;

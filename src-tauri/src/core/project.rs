@@ -179,6 +179,42 @@ pub fn link_project_instance(
     Ok(())
 }
 
+pub fn list_projects_for_instance(
+    connection: &Connection,
+    instance_id: &str,
+) -> Result<Vec<(Project, bool)>> {
+    let mut statement = connection.prepare(
+        "SELECT p.id, p.name, p.root_path, p.build_tool, p.output_dir, p.gradle_task,
+                p.auto_build, p.auto_deploy, p.created_at, p.updated_at, l.auto_deploy
+         FROM project_instance_links l
+         JOIN projects p ON p.id = l.project_id
+         WHERE l.instance_id = ?1
+         ORDER BY p.updated_at DESC",
+    )?;
+    let rows = statement.query_map(params![instance_id], |row| {
+        Ok((
+            Project {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                root_path: row.get(2)?,
+                build_tool: row.get(3)?,
+                output_dir: row.get(4)?,
+                gradle_task: row.get(5)?,
+                auto_build: row.get::<_, i64>(6)? != 0,
+                auto_deploy: row.get::<_, i64>(7)? != 0,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+            },
+            row.get::<_, i64>(10)? != 0,
+        ))
+    })?;
+    let mut projects = Vec::new();
+    for row in rows {
+        projects.push(row?);
+    }
+    Ok(projects)
+}
+
 pub fn unlink_project_instance(
     connection: &Connection,
     project_id: &str,

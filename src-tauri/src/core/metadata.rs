@@ -3,9 +3,13 @@ use std::io::Read;
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use zip::ZipArchive;
+
+use crate::db::models::{Instance, ModMetadata};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +22,115 @@ pub struct ParsedModMetadata {
     pub depends: HashMap<String, String>,
     pub breaks: HashMap<String, String>,
     pub conflicts: HashMap<String, String>,
+}
+
+pub fn refresh_instance_mod_metadata(
+    connection: &Connection,
+    instance: &Instance,
+) -> Result<Vec<ModMetadata>> {
+    let mods_dir = std::path::PathBuf::from(&instance.directory).join("mods");
+    std::fs::create_dir_all(&mods_dir)?;
+    let mut metadata_list = Vec::new();
+
+    for entry in std::fs::read_dir(&mods_dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if file_name.ends_with(".disabled") || !file_name.to_ascii_lowercase().ends_with(".jar") {
+            continue;
+        }
+        let Some(parsed) = parse_jar_metadata(&entry.path())? else {
+            continue;
+        };
+        let sha256 = sha256_file(&entry.path())?;
+        let metadata = ModMetadata {
+            instance_id: instance.id.clone(),
+            mod_id: parsed.mod_id,
+            mod_name: parsed.mod_name,
+            version: parsed.version,
+            loader: parsed.loader,
+            file_name,
+            sha256,
+            source_type: "local".to_string(),
+            depends_json: serde_json::to_string(&parsed.depends)?,
+            breaks_json: serde_json::to_string(&parsed.breaks)?,
+            conflicts_json: serde_json::to_string(&parsed.conflicts)?,
+        };
+        upsert_mod_metadata(connection, &metadata)?;
+        metadata_list.push(metadata);
+    }
+
+    Ok(metadata_list)
+}
+
+pub fn list_mod_metadata(connection: &Connection, instance_id: &str) -> Result<Vec<ModMetadata>> {
+    let mut statement = connection.prepare(
+        "SELECT instance_id, mod_id, mod_name, version, loader, file_name, sha256,
+                source_type, depends_json, breaks_json, conflicts_json
+         FROM mod_metadata WHERE instance_id = ?1 ORDER BY mod_name COLLATE NOCASE",
+    )?;
+    let rows = statement.query_map(params![instance_id], |row| {
+        Ok(ModMetadata {
+            instance_id: row.get(0)?,
+            mod_id: row.get(1)?,
+            mod_name: row.get(2)?,
+            version: row.get(3)?,
+            loader: row.get(4)?,
+            file_name: row.get(5)?,
+            sha256: row.get(6)?,
+            source_type: row.get(7)?,
+            depends_json: row.get(8)?,
+            breaks_json: row.get(9)?,
+            conflicts_json: row.get(10)?,
+        })
+    })?;
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
+pub fn sha256_file(path: &Path) -> Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher)?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn upsert_mod_metadata(connection: &Connection, metadata: &ModMetadata) -> Result<()> {
+    connection.execute(
+        "INSERT INTO mod_metadata (
+            instance_id, mod_id, mod_name, version, loader, file_name, sha256,
+            source_type, depends_json, breaks_json, conflicts_json
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+         ON CONFLICT(instance_id, file_name) DO UPDATE SET
+            mod_id = excluded.mod_id,
+            mod_name = excluded.mod_name,
+            version = excluded.version,
+            loader = excluded.loader,
+            sha256 = excluded.sha256,
+            source_type = excluded.source_type,
+            depends_json = excluded.depends_json,
+            breaks_json = excluded.breaks_json,
+            conflicts_json = excluded.conflicts_json",
+        params![
+            metadata.instance_id,
+            metadata.mod_id,
+            metadata.mod_name,
+            metadata.version,
+            metadata.loader,
+            metadata.file_name,
+            metadata.sha256,
+            metadata.source_type,
+            metadata.depends_json,
+            metadata.breaks_json,
+            metadata.conflicts_json,
+        ],
+    )?;
+    Ok(())
 }
 
 pub fn parse_jar_metadata(path: &Path) -> Result<Option<ParsedModMetadata>> {

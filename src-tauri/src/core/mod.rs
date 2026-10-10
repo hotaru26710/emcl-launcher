@@ -1,6 +1,10 @@
 pub mod artifact;
 pub mod auth;
+pub mod build;
 pub mod community;
+pub mod conflict;
+pub mod crash;
+pub mod deploy;
 pub mod install;
 pub mod instance;
 pub mod java;
@@ -11,3 +15,4 @@ pub mod mods;
 pub mod paths;
 pub mod project;
 pub mod version;
+pub mod watcher;

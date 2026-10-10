@@ -2,6 +2,7 @@ mod commands;
 mod core;
 mod db;
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -18,6 +19,7 @@ pub struct AppState {
     pub http: Client,
     pub paths: LauncherPaths,
     pub processes: ProcessRegistry,
+    pub watchers: Mutex<HashMap<String, notify::RecommendedWatcher>>,
 }
 
 fn bootstrap(app: &mut tauri::App) -> Result<()> {
@@ -38,7 +40,10 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
         http,
         paths,
         processes: ProcessRegistry::default(),
+        watchers: Mutex::new(HashMap::new()),
     });
+
+    let _ = core::watcher::start_registered_watchers(app.handle().clone());
 
     Ok(())
 }
@@ -101,6 +106,14 @@ pub fn run() {
             commands::project::scan_project_artifacts,
             commands::project::list_build_artifacts,
             commands::project::get_build_artifact,
+            commands::project::run_project_build,
+            commands::project::deploy_build_artifact,
+            commands::project::check_instance_conflicts,
+            commands::project::list_conflict_reports,
+            commands::project::refresh_instance_mod_metadata,
+            commands::project::start_project_watcher,
+            commands::project::stop_project_watcher,
+            commands::project::analyze_crash_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

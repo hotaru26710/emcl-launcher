@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   CloudDownload,
   Cpu,
@@ -11,6 +12,7 @@ import {
   Power,
   PowerOff,
   Save,
+  ShieldAlert,
   Square,
   Terminal,
   Trash2,
@@ -18,7 +20,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api } from "../api/tauri";
-import type { Instance, JavaRecommendation, ModInfo } from "../api/types";
+import type { CrashAnalysis, Instance, JavaRecommendation, ModInfo } from "../api/types";
 import { InstallProgressCard } from "../components/ProgressBar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
@@ -53,6 +55,8 @@ export function InstanceDetail() {
   const [detectingJava, setDetectingJava] = useState(false);
   const [mods, setMods] = useState<ModInfo[]>([]);
   const [loadingMods, setLoadingMods] = useState(false);
+  const [crashAnalysis, setCrashAnalysis] = useState<CrashAnalysis | null>(null);
+  const [analyzingCrash, setAnalyzingCrash] = useState(false);
   const [saving, setSaving] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -197,6 +201,17 @@ export function InstanceDetail() {
     }
   };
 
+  const analyzeCrash = async () => {
+    setAnalyzingCrash(true);
+    try {
+      setCrashAnalysis(await api.analyzeCrashLog(instance.id));
+    } catch {
+      // The shared error banner owns the message.
+    } finally {
+      setAnalyzingCrash(false);
+    }
+  };
+
   const install = async () => {
     try {
       await startInstall(instance.versionId, instance.id);
@@ -255,6 +270,13 @@ export function InstanceDetail() {
                 启动游戏
               </button>
             )}
+            <Link
+              to={`/instances/${instance.id}/conflicts`}
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-300/[0.12]"
+            >
+              <ShieldAlert size={16} />
+              冲突报告
+            </Link>
             <button
               type="button"
               disabled={progress?.status === "running" || running}
@@ -508,9 +530,19 @@ export function InstanceDetail() {
           </div>
 
           <div className="glass-panel hover-lift rounded-[28px] p-5">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-              <Cpu size={16} />
-              日志
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <Cpu size={16} />
+                日志
+              </div>
+              <button
+                type="button"
+                disabled={analyzingCrash}
+                onClick={() => void analyzeCrash()}
+                className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1.5 text-[11px] text-cyan-200 transition hover:bg-cyan-300/[0.12] disabled:opacity-40"
+              >
+                {analyzingCrash ? "分析中..." : "分析最近日志"}
+              </button>
             </div>
             <div
               ref={logRef}
@@ -534,6 +566,27 @@ export function InstanceDetail() {
                 ))
               )}
             </div>
+            {crashAnalysis ? (
+              <div className={[
+                "mt-3 rounded-2xl border p-4",
+                crashAnalysis.severity === "error"
+                  ? "border-rose-300/15 bg-rose-300/[0.06]"
+                  : "border-amber-300/15 bg-amber-300/[0.06]",
+              ].join(" ")}>
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+                  <AlertTriangle size={15} />
+                  {crashAnalysis.summary}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-400">{crashAnalysis.suggestion}</p>
+                {crashAnalysis.matchedLines.length > 0 ? (
+                  <div className="mt-3 max-h-32 overflow-y-auto rounded-xl bg-slate-950/50 p-3 font-mono text-[10px] leading-5 text-slate-500">
+                    {crashAnalysis.matchedLines.map((line, index) => (
+                      <div key={`${index}-${line}`}>{line}</div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </section>
       </div>

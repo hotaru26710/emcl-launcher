@@ -7,6 +7,7 @@ import { InstanceDetail } from "./pages/InstanceDetail";
 import { Instances } from "./pages/Instances";
 import { CreateInstance } from "./pages/CreateInstance";
 import { CommunityMods } from "./pages/CommunityMods";
+import { ConflictReport } from "./pages/ConflictReport";
 import { BuildTimeline } from "./pages/BuildTimeline";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import { Projects } from "./pages/Projects";
@@ -116,6 +117,7 @@ function App() {
           <Route path="/instances" element={<Instances />} />
           <Route path="/instances/create" element={<CreateInstance />} />
           <Route path="/instances/:id/community" element={<CommunityMods />} />
+          <Route path="/instances/:id/conflicts" element={<ConflictReport />} />
           <Route path="/instances/:id" element={<InstanceDetail />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />

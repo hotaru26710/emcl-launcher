@@ -8,6 +8,7 @@ use crate::core::java;
 use crate::core::launch::{self, LaunchRequest, LaunchResult};
 use crate::core::loader;
 use crate::core::version;
+use crate::core::{build, deploy, project};
 use crate::db::models::now_rfc3339;
 use crate::AppState;
 
@@ -18,6 +19,7 @@ pub async fn launch_instance(
     instance_id: String,
 ) -> Result<LaunchResult, String> {
     let settings = load_settings(&state)?;
+    prepare_instance_for_launch(&app, &state, &instance_id).await?;
     let (instance, account) = {
         let connection = state.db.lock().map_err(|error| error.to_string())?;
         let instance = instance_core::get_instance(&connection, &instance_id)
@@ -96,4 +98,39 @@ pub fn stop_instance(state: State<'_, AppState>, instance_id: String) -> Result<
 #[tauri::command]
 pub fn is_instance_running(state: State<'_, AppState>, instance_id: String) -> bool {
     launch::is_running(&state.processes, &instance_id)
+}
+
+async fn prepare_instance_for_launch(
+    app: &AppHandle,
+    state: &AppState,
+    instance_id: &str,
+) -> Result<(), String> {
+    let linked_projects = {
+        let connection = state.db.lock().map_err(|error| error.to_string())?;
+        project::list_projects_for_instance(&connection, instance_id)
+            .map_err(|error| error.to_string())?
+    };
+
+    for (project, link_auto_deploy) in linked_projects {
+        if project.auto_build {
+            build::build_project(app.clone(), &project)
+                .await
+                .map_err(|error| format!("工程 {} 构建失败：{error}", project.name))?;
+            let connection = state.db.lock().map_err(|error| error.to_string())?;
+            crate::core::artifact::scan_project_artifacts(&connection, &project)
+                .map_err(|error| error.to_string())?;
+        }
+        if project.auto_deploy && link_auto_deploy {
+            let instance = {
+                let connection = state.db.lock().map_err(|error| error.to_string())?;
+                instance_core::get_instance(&connection, instance_id)
+                    .map_err(|error| error.to_string())?
+                    .ok_or_else(|| "实例不存在".to_string())?
+            };
+            let connection = state.db.lock().map_err(|error| error.to_string())?;
+            deploy::deploy_latest(&connection, &instance, &project.id)
+                .map_err(|error| format!("工程 {} 部署失败：{error}", project.name))?;
+        }
+    }
+    Ok(())
 }
