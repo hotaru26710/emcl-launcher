@@ -99,6 +99,27 @@ pub fn update_settings(
         )
         .map_err(|error| error.to_string())?;
     }
+    if let Some(theme) = input.theme {
+        let theme = theme.trim().to_string();
+        if ![
+            "system", "dark", "light", "pink", "ocean", "forest", "amber", "custom",
+        ]
+        .contains(&theme.as_str())
+        {
+            return Err("invalid theme".to_string());
+        }
+        set_setting(&connection, "theme", &theme).map_err(|error| error.to_string())?;
+    }
+    if let Some(custom_theme) = input.custom_theme {
+        if custom_theme.trim().is_empty() {
+            connection
+                .execute("DELETE FROM settings WHERE key = 'custom_theme_json'", [])
+                .map_err(|error| error.to_string())?;
+        } else {
+            set_setting(&connection, "custom_theme_json", custom_theme.trim())
+                .map_err(|error| error.to_string())?;
+        }
+    }
     if let Some(client_id) = input.microsoft_client_id {
         if client_id.trim().is_empty() {
             connection

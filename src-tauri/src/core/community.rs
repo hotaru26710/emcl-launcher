@@ -98,6 +98,12 @@ struct ModrinthSearchHit {
 }
 
 #[derive(Debug, Deserialize)]
+struct ModrinthProject {
+    id: String,
+    title: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct ModrinthVersion {
     id: String,
     project_id: String,
@@ -262,25 +268,35 @@ async fn find_and_install_dependency(
     target: &str,
 ) -> Result<String> {
     let normalized = normalize_mod_id(target);
-    let results = search_modrinth(
-        client,
-        target,
-        &instance.version_id,
-        instance.loader.as_deref(),
-        0,
-    )
-    .await?;
-    let project = results
-        .into_iter()
-        .find(|project| {
-            normalize_mod_id(&project.slug) == normalized
-                || normalize_mod_id(&project.title) == normalized
-                || normalize_mod_id(&project.project_id) == normalized
-        })
-        .with_context(|| format!("Modrinth 没有找到匹配项目：{target}"))?;
+    let project = if let Ok(project) =
+        api_get::<ModrinthProject>(client, &format!("{MODRINTH_API}/project/{target}"), &[]).await
+    {
+        project
+    } else {
+        let results = search_modrinth(
+            client,
+            target,
+            &instance.version_id,
+            instance.loader.as_deref(),
+            0,
+        )
+        .await?;
+        let project = results
+            .into_iter()
+            .find(|project| {
+                normalize_mod_id(&project.slug) == normalized
+                    || normalize_mod_id(&project.title) == normalized
+                    || normalize_mod_id(&project.project_id) == normalized
+            })
+            .with_context(|| format!("Modrinth 没有找到匹配项目：{target}"))?;
+        ModrinthProject {
+            id: project.project_id,
+            title: project.title,
+        }
+    };
     let versions = get_modrinth_versions(
         client,
-        &project.project_id,
+        &project.id,
         &instance.version_id,
         instance.loader.as_deref(),
     )
