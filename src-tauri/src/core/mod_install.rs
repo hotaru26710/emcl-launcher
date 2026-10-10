@@ -174,6 +174,23 @@ pub fn sync_from_mods(connection: &Connection, instance: &Instance) -> Result<Ve
     list_installed(connection, &instance.id)
 }
 
+pub fn set_source(
+    connection: &Connection,
+    instance_id: &str,
+    mod_id: &str,
+    platform: &str,
+    project_id: &str,
+    version_id: Option<&str>,
+) -> Result<()> {
+    connection.execute(
+        "UPDATE installed_mods
+         SET platform = ?1, project_id = ?2, version_id = COALESCE(?3, version_id)
+         WHERE instance_id = ?4 AND mod_id = ?5",
+        params![platform, project_id, version_id, instance_id, mod_id],
+    )?;
+    Ok(())
+}
+
 pub fn list_installed(connection: &Connection, instance_id: &str) -> Result<Vec<InstalledMod>> {
     let mut statement = connection.prepare(
         "SELECT instance_id, mod_id, mod_name, version, platform, project_id,
