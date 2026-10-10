@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
@@ -95,4 +97,76 @@ pub struct UpdateSettingsInput {
 
 pub fn now_rfc3339() -> String {
     Utc::now().to_rfc3339()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub root_path: String,
+    pub build_tool: String,
+    pub output_dir: String,
+    pub gradle_task: String,
+    pub auto_build: bool,
+    pub auto_deploy: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateProjectInput {
+    pub name: String,
+    pub root_path: String,
+    pub output_dir: Option<String>,
+    pub gradle_task: Option<String>,
+    pub auto_build: Option<bool>,
+    pub auto_deploy: Option<bool>,
+    pub instance_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildArtifact {
+    pub id: String,
+    pub project_id: String,
+    pub file_path: String,
+    pub sha256: String,
+    pub file_size: u64,
+    pub built_at: String,
+    pub git_commit: Option<String>,
+    pub git_branch: Option<String>,
+    pub status: String,
+    pub deployed_instance_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModMetadata {
+    pub instance_id: String,
+    pub mod_id: Option<String>,
+    pub mod_name: Option<String>,
+    pub version: Option<String>,
+    pub loader: Option<String>,
+    pub file_name: String,
+    pub sha256: String,
+    pub source_type: String,
+    pub depends_json: String,
+    pub breaks_json: String,
+    pub conflicts_json: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictReport {
+    pub id: i64,
+    pub instance_id: String,
+    pub severity: String,
+    pub conflict_type: String,
+    pub source_mod_id: Option<String>,
+    pub target_mod_id: Option<String>,
+    pub detail: String,
+    pub suggestion: String,
+    pub created_at: String,
 }

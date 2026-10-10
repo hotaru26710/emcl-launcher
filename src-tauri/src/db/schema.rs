@@ -88,6 +88,84 @@ fn migrate(connection: &Connection) -> Result<()> {
             .context("failed to run database migration 1")?;
     }
 
+    if version < 2 {
+        connection
+            .execute_batch(
+                "BEGIN;
+                 CREATE TABLE IF NOT EXISTS projects (
+                     id TEXT PRIMARY KEY NOT NULL,
+                     name TEXT NOT NULL,
+                     root_path TEXT NOT NULL UNIQUE,
+                     build_tool TEXT NOT NULL DEFAULT 'gradle',
+                     output_dir TEXT NOT NULL,
+                     gradle_task TEXT NOT NULL DEFAULT 'build',
+                     auto_build INTEGER NOT NULL DEFAULT 0,
+                     auto_deploy INTEGER NOT NULL DEFAULT 1,
+                     created_at TEXT NOT NULL,
+                     updated_at TEXT NOT NULL
+                 );
+
+                 CREATE TABLE IF NOT EXISTS project_instance_links (
+                     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                     instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+                     auto_deploy INTEGER NOT NULL DEFAULT 1,
+                     PRIMARY KEY(project_id, instance_id)
+                 );
+
+                 CREATE TABLE IF NOT EXISTS build_artifacts (
+                     id TEXT PRIMARY KEY NOT NULL,
+                     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                     file_path TEXT NOT NULL,
+                     sha256 TEXT NOT NULL,
+                     file_size INTEGER NOT NULL,
+                     built_at TEXT NOT NULL,
+                     git_commit TEXT,
+                     git_branch TEXT,
+                     status TEXT NOT NULL DEFAULT 'detected',
+                     deployed_instance_ids TEXT NOT NULL DEFAULT '[]',
+                     UNIQUE(project_id, sha256)
+                 );
+
+                 CREATE TABLE IF NOT EXISTS mod_metadata (
+                     instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+                     mod_id TEXT,
+                     mod_name TEXT,
+                     version TEXT,
+                     loader TEXT,
+                     file_name TEXT NOT NULL,
+                     sha256 TEXT NOT NULL,
+                     source_type TEXT NOT NULL DEFAULT 'local',
+                     depends_json TEXT NOT NULL DEFAULT '[]',
+                     breaks_json TEXT NOT NULL DEFAULT '[]',
+                     conflicts_json TEXT NOT NULL DEFAULT '[]',
+                     PRIMARY KEY(instance_id, file_name)
+                 );
+
+                 CREATE TABLE IF NOT EXISTS conflict_reports (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+                     severity TEXT NOT NULL,
+                     type TEXT NOT NULL,
+                     source_mod_id TEXT,
+                     target_mod_id TEXT,
+                     detail TEXT NOT NULL,
+                     suggestion TEXT NOT NULL,
+                     created_at TEXT NOT NULL
+                 );
+
+                 CREATE INDEX IF NOT EXISTS idx_projects_updated_at
+                     ON projects(updated_at DESC);
+                 CREATE INDEX IF NOT EXISTS idx_build_artifacts_project_built
+                     ON build_artifacts(project_id, built_at DESC);
+                 CREATE INDEX IF NOT EXISTS idx_conflict_reports_instance_created
+                     ON conflict_reports(instance_id, created_at DESC);
+
+                 PRAGMA user_version = 2;
+                 COMMIT;",
+            )
+            .context("failed to run database migration 2")?;
+    }
+
     Ok(())
 }
 
