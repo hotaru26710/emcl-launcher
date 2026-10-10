@@ -128,6 +128,25 @@ pub struct CreateProjectInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LinkedProjectInstance {
+    pub project_id: String,
+    pub instance_id: String,
+    pub instance_name: String,
+    pub auto_deploy: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProjectInput {
+    pub name: Option<String>,
+    pub output_dir: Option<String>,
+    pub gradle_task: Option<String>,
+    pub auto_build: Option<bool>,
+    pub auto_deploy: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BuildArtifact {
     pub id: String,
     pub project_id: String,

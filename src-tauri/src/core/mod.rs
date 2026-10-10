@@ -7,4 +7,5 @@ pub mod launch;
 pub mod loader;
 pub mod mods;
 pub mod paths;
+pub mod project;
 pub mod version;

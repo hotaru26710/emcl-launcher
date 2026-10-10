@@ -1,5 +1,6 @@
 import {
   Boxes,
+  FolderGit2,
   Gamepad2,
   LogIn,
   Settings,
@@ -10,6 +11,7 @@ import { NavLink } from "react-router-dom";
 const navigation = [
   { to: "/instances", label: "实例", hint: "INSTANCES", icon: Gamepad2 },
   { to: "/versions", label: "版本", hint: "VERSIONS", icon: Boxes },
+  { to: "/projects", label: "工程", hint: "PROJECTS", icon: FolderGit2 },
   { to: "/settings", label: "设置", hint: "SETTINGS", icon: Settings },
   { to: "/login", label: "账户", hint: "ACCOUNTS", icon: LogIn },
 ];

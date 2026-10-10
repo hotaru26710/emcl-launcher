@@ -47,6 +47,7 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             bootstrap(app).map_err(|error| {
                 Box::new(std::io::Error::other(error.to_string())) as Box<dyn std::error::Error>
@@ -88,6 +89,15 @@ pub fn run() {
             commands::community::search_modrinth_mods,
             commands::community::get_modrinth_versions,
             commands::community::install_modrinth_version,
+            commands::project::inspect_project_directory,
+            commands::project::list_projects,
+            commands::project::get_project,
+            commands::project::create_project,
+            commands::project::update_project,
+            commands::project::delete_project,
+            commands::project::link_project_instance,
+            commands::project::unlink_project_instance,
+            commands::project::list_project_instances,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

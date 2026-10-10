@@ -7,6 +7,8 @@ import { InstanceDetail } from "./pages/InstanceDetail";
 import { Instances } from "./pages/Instances";
 import { CreateInstance } from "./pages/CreateInstance";
 import { CommunityMods } from "./pages/CommunityMods";
+import { ProjectDetail } from "./pages/ProjectDetail";
+import { Projects } from "./pages/Projects";
 import { Login } from "./pages/Login";
 import { SettingsPage } from "./pages/Settings";
 import { Versions } from "./pages/Versions";
@@ -114,6 +116,8 @@ function App() {
           <Route path="/instances/create" element={<CreateInstance />} />
           <Route path="/instances/:id/community" element={<CommunityMods />} />
           <Route path="/instances/:id" element={<InstanceDetail />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/versions" element={<Versions />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/login" element={<Login />} />

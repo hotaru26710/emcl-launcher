@@ -56,6 +56,52 @@ export interface VersionDetails {
   logging?: unknown;
 }
 
+export interface ProjectInspection {
+  name: string;
+  rootPath: string;
+  buildTool: string;
+  outputDir: string;
+  gradleTask: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  rootPath: string;
+  buildTool: string;
+  outputDir: string;
+  gradleTask: string;
+  autoBuild: boolean;
+  autoDeploy: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LinkedProjectInstance {
+  projectId: string;
+  instanceId: string;
+  instanceName: string;
+  autoDeploy: boolean;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  rootPath: string;
+  outputDir?: string | null;
+  gradleTask?: string | null;
+  autoBuild?: boolean | null;
+  autoDeploy?: boolean | null;
+  instanceIds?: string[] | null;
+}
+
+export interface UpdateProjectInput {
+  name?: string | null;
+  outputDir?: string | null;
+  gradleTask?: string | null;
+  autoBuild?: boolean | null;
+  autoDeploy?: boolean | null;
+}
+
 export interface Instance {
   id: string;
   name: string;

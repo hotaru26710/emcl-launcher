@@ -4,6 +4,7 @@ import type {
   AccountSummary,
   CommunityInstallResult,
   CreateInstanceInput,
+  CreateProjectInput,
   DeviceCodeResponse,
   InstallLoaderInput,
   InstallProgress,
@@ -15,7 +16,11 @@ import type {
   InstallModrinthInput,
   ModrinthSearchResult,
   ModrinthVersionInfo,
+  Project,
+  ProjectInspection,
+  LinkedProjectInstance,
   SearchModrinthInput,
+  UpdateProjectInput,
   Instance,
   JavaInstallation,
   JavaRecommendation,
@@ -57,6 +62,21 @@ export const api = {
   createOfflineAccount: (username: string) =>
     invoke<AccountSummary>("create_offline_account", { username }),
   deleteAccount: (id: string) => invoke<void>("delete_account", { id }),
+  inspectProjectDirectory: (path: string) =>
+    invoke<ProjectInspection>("inspect_project_directory", { path }),
+  listProjects: () => invoke<Project[]>("list_projects"),
+  getProject: (id: string) => invoke<Project | null>("get_project", { id }),
+  createProject: (input: CreateProjectInput) =>
+    invoke<Project>("create_project", { input }),
+  updateProject: (id: string, input: UpdateProjectInput) =>
+    invoke<Project>("update_project", { id, input }),
+  deleteProject: (id: string) => invoke<void>("delete_project", { id }),
+  linkProjectInstance: (projectId: string, instanceId: string, autoDeploy = true) =>
+    invoke<void>("link_project_instance", { projectId, instanceId, autoDeploy }),
+  unlinkProjectInstance: (projectId: string, instanceId: string) =>
+    invoke<void>("unlink_project_instance", { projectId, instanceId }),
+  listProjectInstances: (projectId: string) =>
+    invoke<LinkedProjectInstance[]>("list_project_instances", { projectId }),
   setActiveAccount: (id: string) => invoke<void>("set_active_account", { id }),
   getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
   startMicrosoftLogin: () => invoke<DeviceCodeResponse>("start_microsoft_login"),
