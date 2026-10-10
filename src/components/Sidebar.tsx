@@ -16,8 +16,8 @@ const navigation = [
 
 export function Sidebar() {
   return (
-    <aside className="group/sidebar relative z-20 w-20 shrink-0 p-3 pr-0 transition-[width] duration-300 ease-out hover:w-[17.5rem]">
-      <div className="glass-panel flex h-full flex-col rounded-[30px] px-2 py-4 transition-[padding] duration-300 group-hover/sidebar:px-3">
+    <aside className="relative z-20 w-20 shrink-0 p-3 pr-0">
+      <div className="group/sidebar glass-panel absolute bottom-3 left-3 top-3 z-30 flex w-[4.25rem] flex-col rounded-[30px] px-2 py-4 shadow-[0_18px_55px_rgba(2,6,23,0.42)] transition-[width,padding] duration-300 ease-out hover:w-[17.5rem] hover:px-3">
         <div className="group flex items-center gap-3 rounded-3xl border border-white/[0.06] bg-white/[0.025] px-3 py-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_35px_rgba(34,211,238,0.13)] transition duration-500 group-hover:rotate-3 group-hover:scale-105">
             <Waves size={22} />
