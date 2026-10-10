@@ -6,6 +6,7 @@ import { Layout } from "./components/Layout";
 import { InstanceDetail } from "./pages/InstanceDetail";
 import { Instances } from "./pages/Instances";
 import { CreateInstance } from "./pages/CreateInstance";
+import { CommunityMods } from "./pages/CommunityMods";
 import { Login } from "./pages/Login";
 import { SettingsPage } from "./pages/Settings";
 import { Versions } from "./pages/Versions";
@@ -111,6 +112,7 @@ function App() {
           <Route index element={<Navigate to="/instances" replace />} />
           <Route path="/instances" element={<Instances />} />
           <Route path="/instances/create" element={<CreateInstance />} />
+          <Route path="/instances/:id/community" element={<CommunityMods />} />
           <Route path="/instances/:id" element={<InstanceDetail />} />
           <Route path="/versions" element={<Versions />} />
           <Route path="/settings" element={<SettingsPage />} />

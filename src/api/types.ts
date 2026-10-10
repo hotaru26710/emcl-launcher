@@ -119,6 +119,57 @@ export interface InstallLoaderInput {
   jobId?: string | null;
 }
 
+export interface ModrinthSearchResult {
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  iconUrl?: string | null;
+  downloads: number;
+  follows: number;
+  author: string;
+  categories: string[];
+  versions: string[];
+}
+
+export interface ModrinthHashes {
+  sha1?: string | null;
+  sha512?: string | null;
+}
+
+export interface ModrinthFile {
+  url: string;
+  filename: string;
+  primary: boolean;
+  size: number;
+  hashes: ModrinthHashes;
+}
+
+export interface ModrinthVersionInfo {
+  id: string;
+  projectId: string;
+  name: string;
+  versionNumber: string;
+  versionType: string;
+  gameVersions: string[];
+  loaders: string[];
+  datePublished: string;
+  downloads: number;
+  files: ModrinthFile[];
+}
+
+export interface SearchModrinthInput {
+  query: string;
+  gameVersion: string;
+  loader?: string | null;
+  offset?: number | null;
+}
+
+export interface InstallModrinthInput {
+  instanceId: string;
+  versionId: string;
+}
+
 export interface ModInfo {
   fileName: string;
   name: string;

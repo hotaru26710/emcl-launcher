@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod community;
 pub mod install;
 pub mod instance;
 pub mod java;

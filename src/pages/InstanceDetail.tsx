@@ -441,7 +441,15 @@ export function InstanceDetail() {
                 <Package size={16} />
                 模组
               </div>
-              <StatusPill tone={mods.length > 0 ? "cyan" : "slate"}>{`${mods.length} 个`}</StatusPill>
+              <div className="flex items-center gap-2">
+                <Link
+                  to={`/instances/${instance.id}/community`}
+                  className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1.5 text-[11px] text-cyan-200 transition hover:bg-cyan-300/[0.12]"
+                >
+                  浏览社区模组
+                </Link>
+                <StatusPill tone={mods.length > 0 ? "cyan" : "slate"}>{`${mods.length} 个`}</StatusPill>
+              </div>
             </div>
             <div className="mt-3 rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.035] px-4 py-4 text-center text-xs leading-5 text-slate-500">
               将 `.jar` 模组拖到窗口里即可安装；安装后启停只需重命名文件。

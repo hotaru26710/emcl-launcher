@@ -10,6 +10,10 @@ import type {
   InstallVersionInput,
   LoaderInstallResult,
   ModInfo,
+  InstallModrinthInput,
+  ModrinthSearchResult,
+  ModrinthVersionInfo,
+  SearchModrinthInput,
   Instance,
   JavaInstallation,
   JavaRecommendation,
@@ -69,6 +73,12 @@ export const api = {
     invoke<ModInfo[]>("toggle_mod", { instanceId, fileName, enabled }),
   deleteMod: (instanceId: string, fileName: string) =>
     invoke<ModInfo[]>("delete_mod", { instanceId, fileName }),
+  searchModrinthMods: (input: SearchModrinthInput) =>
+    invoke<ModrinthSearchResult[]>("search_modrinth_mods", { input }),
+  getModrinthVersions: (projectId: string, gameVersion: string, loader?: string | null) =>
+    invoke<ModrinthVersionInfo[]>("get_modrinth_versions", { projectId, gameVersion, loader }),
+  installModrinthVersion: (input: InstallModrinthInput) =>
+    invoke<ModInfo[]>("install_modrinth_version", { input }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),
