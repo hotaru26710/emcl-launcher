@@ -20,6 +20,22 @@ pub struct ConflictFinding {
     pub suggestion: String,
 }
 
+const PLATFORM_DEPENDENCIES: &[&str] = &[
+    "minecraft",
+    "forge",
+    "neoforge",
+    "fabric",
+    "fabricloader",
+    "fabric-loader",
+    "quilt",
+    "quilt_loader",
+    "quilt-loader",
+    "java",
+    "javafml",
+    "fml",
+    "minecraftforge",
+];
+
 pub fn check_instance_conflicts(
     connection: &Connection,
     instance: &Instance,
@@ -88,6 +104,9 @@ fn detect_conflicts(mods: &[ModMetadata]) -> Vec<ConflictFinding> {
             .clone()
             .unwrap_or_else(|| metadata.file_name.clone());
         for (target, range) in parse_map(&metadata.depends_json) {
+            if is_platform_dependency(&target) {
+                continue;
+            }
             let Some(dependency) = by_id.get(&target.to_ascii_lowercase()) else {
                 findings.push(ConflictFinding {
                     severity: "error".to_string(),
@@ -216,6 +235,12 @@ fn persist_reports(
     Ok(())
 }
 
+fn is_platform_dependency(value: &str) -> bool {
+    PLATFORM_DEPENDENCIES
+        .iter()
+        .any(|platform| platform.eq_ignore_ascii_case(value.trim()))
+}
+
 fn parse_map(json: &str) -> Vec<(String, String)> {
     serde_json::from_str::<HashMap<String, String>>(json)
         .map(|map| map.into_iter().collect())
@@ -315,6 +340,26 @@ fn parse_version(value: &str) -> Vec<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ignores_platform_dependencies() {
+        let metadata = ModMetadata {
+            instance_id: "instance".to_string(),
+            mod_id: Some("re_mc".to_string()),
+            mod_name: Some("Re MC".to_string()),
+            version: Some("1.0.0".to_string()),
+            loader: Some("forge".to_string()),
+            file_name: "re_mc.jar".to_string(),
+            sha256: String::new(),
+            source_type: "build".to_string(),
+            depends_json: r#"{"minecraft":">=1.20.1","forge":"[47,)","tectonic":"*"}"#.to_string(),
+            breaks_json: "{}".to_string(),
+            conflicts_json: "{}".to_string(),
+        };
+        let findings = detect_conflicts(&[metadata]);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].target_mod_id.as_deref(), Some("tectonic"));
+    }
 
     #[test]
     fn compares_common_dependency_ranges() {
