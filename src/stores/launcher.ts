@@ -302,11 +302,57 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
   },
 
   installLoader: async (instanceId, loader, loaderVersion = null) => {
+    const jobId = crypto.randomUUID();
+    const instance = get().instances.find((item) => item.id === instanceId);
+    set((state) => ({
+      activeInstall: {
+        jobId,
+        versionId: instance?.versionId ?? "",
+        instanceId,
+      },
+      installProgress: {
+        ...state.installProgress,
+        [jobId]: {
+          jobId,
+          versionId: instance?.versionId ?? "",
+          status: "running",
+          stage: "loader",
+          message: "正在准备安装加载器",
+          completedFiles: 0,
+          totalFiles: 0,
+          downloadedBytes: 0,
+          totalBytes: 0,
+          percent: 0,
+        },
+      },
+      lastError: null,
+    }));
+
     try {
-      await api.installLoader({ instanceId, loader, loaderVersion });
+      await api.installLoader({ instanceId, loader, loaderVersion, jobId });
       await get().refreshInstances();
     } catch (error) {
-      set({ lastError: errorMessage(error) });
+      const message = errorMessage(error);
+      set((state) => ({
+        lastError: message,
+        installProgress: {
+          ...state.installProgress,
+          [jobId]: {
+            ...(state.installProgress[jobId] ?? {
+              jobId,
+              versionId: instance?.versionId ?? "",
+              completedFiles: 0,
+              totalFiles: 0,
+              downloadedBytes: 0,
+              totalBytes: 0,
+            }),
+            status: "error",
+            stage: "error",
+            message,
+            percent: state.installProgress[jobId]?.percent ?? 0,
+          } as InstallProgress,
+        },
+      }));
       throw error;
     }
   },

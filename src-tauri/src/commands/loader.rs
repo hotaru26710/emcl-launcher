@@ -19,6 +19,7 @@ pub struct InstallLoaderInput {
     pub instance_id: String,
     pub loader: LoaderType,
     pub loader_version: Option<String>,
+    pub job_id: Option<String>,
 }
 
 #[tauri::command]
@@ -43,7 +44,11 @@ pub async fn install_loader(
     .await
     .map_err(|error| error.to_string())?;
 
-    let job_id = format!("loader-{}", Uuid::new_v4());
+    let job_id = input
+        .job_id
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| format!("loader-{}", Uuid::new_v4()));
     let event_handle = app.clone();
     let sink: install::ProgressSink = Arc::new(move |progress| {
         let _ = event_handle.emit("install-progress", progress);

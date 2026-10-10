@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
+import { InstallProgressCard } from "../components/ProgressBar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate, versionTypeLabel } from "../lib/format";
@@ -26,6 +27,8 @@ export function Instances() {
   const deleteInstance = useLauncherStore((state) => state.deleteInstance);
   const startInstall = useLauncherStore((state) => state.startInstall);
   const installLoader = useLauncherStore((state) => state.installLoader);
+  const activeInstall = useLauncherStore((state) => state.activeInstall);
+  const installProgress = useLauncherStore((state) => state.installProgress);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
@@ -34,6 +37,7 @@ export function Instances() {
   const [loader, setLoader] = useState<"vanilla" | LoaderType>("vanilla");
   const [loaderVersion, setLoaderVersion] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [creatingInstanceId, setCreatingInstanceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -42,9 +46,15 @@ export function Instances() {
     if (settings?.defaultMemoryMb) setMemoryMb(settings.defaultMemoryMb);
   }, [dialogOpen, manifest, settings?.defaultMemoryMb]);
 
+  const creationProgress =
+    activeInstall?.instanceId === creatingInstanceId
+      ? installProgress[activeInstall.jobId]
+      : undefined;
+
   const handleCreate = async () => {
     if (!name.trim()) return;
     setSubmitting(true);
+    setCreatingInstanceId(null);
     try {
       const created = await createInstance({
         name: name.trim(),
@@ -53,16 +63,20 @@ export function Instances() {
         loader: loader === "vanilla" ? null : loader,
         loaderVersion: loader === "vanilla" || !loaderVersion.trim() ? null : loaderVersion.trim(),
       });
+      setCreatingInstanceId(created.id);
       if (loader === "vanilla") {
         await startInstall(created.versionId, created.id);
       } else {
         await installLoader(created.id, loader, loaderVersion.trim() || null);
       }
       setName("");
-      setMemoryMb(4096);
+      setMemoryMb(settings?.defaultMemoryMb ?? 4096);
+      setLoader("vanilla");
+      setLoaderVersion("");
+      setCreatingInstanceId(null);
       setDialogOpen(false);
     } catch {
-      // The shared error banner owns the message.
+      // Keep the dialog open so the failed progress/error remains visible.
     } finally {
       setSubmitting(false);
     }
@@ -171,20 +185,39 @@ export function Instances() {
           <div className="glass-panel animate-card-in w-full max-w-lg rounded-[34px] p-6 shadow-2xl">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">新建游戏实例</h2>
-                <p className="mt-1 text-sm text-slate-500">创建独立存档与模组目录。</p>
+                <h2 className="text-lg font-semibold text-white">
+                  {submitting ? "正在创建实例" : "新建游戏实例"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {submitting
+                    ? "实例目录已就绪，正在安装游戏和加载器；完成后会自动关闭。"
+                    : "创建独立存档与模组目录。"}
+                </p>
               </div>
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setDialogOpen(false)}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-white"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
                 aria-label="关闭"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="mt-6 space-y-4">
+            {submitting ? (
+              <div className="mt-5">
+                {creationProgress ? (
+                  <InstallProgressCard progress={creationProgress} compact />
+                ) : (
+                  <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4 text-sm text-cyan-100">
+                    正在创建实例目录...
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <fieldset disabled={submitting} className="mt-6 space-y-4 disabled:opacity-45">
               <label className="block">
                 <span className="text-xs font-medium text-slate-400">实例名称</span>
                 <input
@@ -258,13 +291,14 @@ export function Instances() {
                   </span>
                 </div>
               </label>
-            </div>
+            </fieldset>
 
             <div className="mt-7 flex justify-end gap-3">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setDialogOpen(false)}
-                className="rounded-xl px-4 py-2.5 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"
+                className="rounded-xl px-4 py-2.5 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
               >
                 取消
               </button>
@@ -274,7 +308,7 @@ export function Instances() {
                 onClick={() => void handleCreate()}
                 className="rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
               >
-                {submitting ? "创建中..." : "创建实例"}
+                {submitting ? "安装中，完成自动关闭" : "创建实例"}
               </button>
             </div>
           </div>

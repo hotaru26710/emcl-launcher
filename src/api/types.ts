@@ -116,6 +116,7 @@ export interface InstallLoaderInput {
   instanceId: string;
   loader: LoaderType;
   loaderVersion?: string | null;
+  jobId?: string | null;
 }
 
 export interface ModInfo {
