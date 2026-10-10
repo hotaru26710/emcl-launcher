@@ -6,6 +6,9 @@ import type {
   CommunityInstallResult,
   ConflictFinding,
   CrashAnalysis,
+  GitHubRepository,
+  GitHubRelease,
+  GitHubAsset,
   DependencyRepairResult,
   ConflictReport,
   CreateInstanceInput,
@@ -135,6 +138,12 @@ export const api = {
     invoke<ModrinthVersionInfo[]>("get_modrinth_versions", { projectId, gameVersion, loader }),
   installModrinthVersion: (input: InstallModrinthInput) =>
     invoke<CommunityInstallResult>("install_modrinth_version", { input }),
+  searchGitHubMods: (query: string, offset?: number) =>
+    invoke<GitHubRepository[]>("search_github_mods", { query, offset }),
+  getGitHubReleases: (owner: string, repo: string) =>
+    invoke<GitHubRelease[]>("get_github_releases", { owner, repo }),
+  installGitHubReleaseAsset: (instanceId: string, asset: GitHubAsset) =>
+    invoke<ModInfo[]>("install_github_release_asset", { instanceId, asset }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),

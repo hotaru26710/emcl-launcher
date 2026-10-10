@@ -5,6 +5,7 @@ pub mod community;
 pub mod conflict;
 pub mod crash;
 pub mod deploy;
+pub mod github;
 pub mod install;
 pub mod instance;
 pub mod java;

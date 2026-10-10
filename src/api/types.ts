@@ -252,6 +252,37 @@ export interface CommunityInstallResult {
   mods: ModInfo[];
 }
 
+export interface GitHubRepository {
+  id: number;
+  fullName: string;
+  name: string;
+  owner: string;
+  description?: string | null;
+  htmlUrl: string;
+  stars: number;
+  forks: number;
+  updatedAt: string;
+  topics: string[];
+}
+
+export interface GitHubAsset {
+  id: number;
+  name: string;
+  size: number;
+  downloadUrl: string;
+  contentType?: string | null;
+}
+
+export interface GitHubRelease {
+  id: number;
+  tagName: string;
+  name?: string | null;
+  htmlUrl: string;
+  publishedAt?: string | null;
+  prerelease: boolean;
+  assets: GitHubAsset[];
+}
+
 export interface ModrinthSearchResult {
   projectId: string;
   slug: string;

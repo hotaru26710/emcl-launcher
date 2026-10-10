@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/tauri";
-import type { CommunityInstallResult, Instance, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
+import type { CommunityInstallResult, GitHubAsset, GitHubRelease, GitHubRepository, Instance, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
@@ -57,8 +57,14 @@ export function CommunityMods() {
   const [instance, setInstance] = useState<Instance | null>(
     instances.find((item) => item.id === id) ?? null,
   );
+  const [source, setSource] = useState<"modrinth" | "github">("modrinth");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ModrinthSearchResult[]>([]);
+  const [githubResults, setGithubResults] = useState<GitHubRepository[]>([]);
+  const [selectedGithub, setSelectedGithub] = useState<GitHubRepository | null>(null);
+  const [githubReleases, setGithubReleases] = useState<GitHubRelease[]>([]);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [githubReleasesLoading, setGithubReleasesLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ModrinthSearchResult | null>(null);
   const [versions, setVersions] = useState<ModrinthVersionInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -156,6 +162,48 @@ export function CommunityMods() {
     }
   };
 
+  const searchGithub = async () => {
+    setGithubLoading(true);
+    setSelectedGithub(null);
+    setGithubReleases([]);
+    setMessage("");
+    try {
+      setGithubResults(await api.searchGitHubMods(query, 0));
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setGithubLoading(false);
+    }
+  };
+
+  const selectGithub = async (repo: GitHubRepository) => {
+    setSelectedGithub(repo);
+    setGithubReleasesLoading(true);
+    setMessage("");
+    try {
+      setGithubReleases(await api.getGitHubReleases(repo.owner, repo.name));
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setGithubReleasesLoading(false);
+    }
+  };
+
+  const installGithubAsset = async (asset: GitHubAsset) => {
+    if (!instance) return;
+    if (!window.confirm("将从 GitHub Release 下载 .jar 到实例 mods 目录，是否继续？")) return;
+    setInstalling(`gh-${asset.id}`);
+    setMessage("");
+    try {
+      const mods = await api.installGitHubReleaseAsset(instance.id, asset);
+      setMessage(`已安装 ${asset.name}，当前实例模组数：${mods.length}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setInstalling(null);
+    }
+  };
+
   if (!instance) {
     return <div className="text-sm text-slate-500">正在读取实例...</div>;
   }
@@ -179,6 +227,21 @@ export function CommunityMods() {
       />
 
       <div className="glass-panel rounded-[30px] p-5">
+        <div className="mb-4 flex rounded-xl border border-white/8 bg-slate-950/40 p-1">
+          {(["modrinth", "github"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setSource(item)}
+              className={[
+                "rounded-lg px-3 py-2 text-xs transition",
+                source === item ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500 hover:text-slate-200",
+              ].join(" ")}
+            >
+              {item === "modrinth" ? "Modrinth 热门" : "GitHub Releases"}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-64 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
@@ -195,11 +258,11 @@ export function CommunityMods() {
           <button
             type="button"
             disabled={loading}
-            onClick={() => void search(true)}
+            onClick={() => void (source === "modrinth" ? search(true) : searchGithub())}
             className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
           >
             <Search size={16} />
-            {loading ? "加载中..." : "搜索"}
+            {loading || githubLoading ? "加载中..." : "搜索"}
           </button>
         </div>
         <p className="mt-3 text-xs text-slate-600">
@@ -355,6 +418,87 @@ export function CommunityMods() {
           )}
         </section>
       </div>
+
+      {source === "github" ? (
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <section className="glass-panel rounded-[28px] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+              <Box size={16} />
+              GitHub 模组仓库
+              <StatusPill tone="slate">{`${githubResults.length} 个`}</StatusPill>
+            </div>
+            <div className="mt-4 max-h-[56vh] space-y-3 overflow-y-auto pr-1">
+              {githubLoading ? (
+                <div className="py-10 text-center text-sm text-slate-500">正在搜索 GitHub...</div>
+              ) : githubResults.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">
+                  输入关键词后搜索公开 GitHub 仓库。
+                </div>
+              ) : githubResults.map((repo) => (
+                <button
+                  key={repo.id}
+                  type="button"
+                  onClick={() => void selectGithub(repo)}
+                  className={[
+                    "w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5",
+                    selectedGithub?.id === repo.id ? "border-cyan-300/30 bg-cyan-300/[0.08]" : "border-white/8 bg-slate-950/30",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-semibold text-slate-100">{repo.fullName}</span>
+                    <StatusPill tone="slate">{`★ ${compactNumber(repo.stars)}`}</StatusPill>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{repo.description ?? "没有简介"}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {repo.topics.slice(0, 4).map((topic) => <span key={topic} className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-slate-500">{topic}</span>)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section className="glass-panel rounded-[28px] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+              <Sparkles size={16} />
+              GitHub Releases
+            </div>
+            <div className="mt-4 max-h-[56vh] space-y-3 overflow-y-auto pr-1">
+              {!selectedGithub ? (
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">先选择一个仓库。</div>
+              ) : githubReleasesLoading ? (
+                <div className="py-10 text-center text-sm text-slate-500">正在读取 Release...</div>
+              ) : githubReleases.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">没有 .jar Release 资产。</div>
+              ) : githubReleases.map((release) => (
+                <div key={release.id} className="rounded-2xl border border-white/8 bg-slate-950/30 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-100">{release.name || release.tagName}</div>
+                      <div className="mt-1 text-xs text-slate-600">{release.tagName} · {formatDate(release.publishedAt)}</div>
+                    </div>
+                    {release.prerelease ? <StatusPill tone="amber">pre</StatusPill> : null}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {release.assets.map((asset) => (
+                      <div key={asset.id} className="flex items-center gap-3 rounded-xl border border-white/6 bg-slate-950/35 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs text-slate-300">{asset.name}</div>
+                          <div className="text-[10px] text-slate-600">{Math.round(asset.size / 1024)} KB</div>
+                        </div>
+                        <button type="button" disabled={installing === `gh-${asset.id}`} onClick={() => void installGithubAsset(asset)} className="rounded-lg bg-cyan-400 px-2.5 py-1.5 text-[11px] font-semibold text-slate-950 disabled:opacity-40">
+                          {installing === `gh-${asset.id}` ? "安装中" : "安装"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <a href={release.htmlUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200">
+                    打开 GitHub Release <ExternalLink size={12} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

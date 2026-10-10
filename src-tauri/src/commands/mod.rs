@@ -1,6 +1,7 @@
 pub mod app;
 pub mod auth;
 pub mod community;
+pub mod github;
 pub mod install;
 pub mod instance;
 pub mod java;
