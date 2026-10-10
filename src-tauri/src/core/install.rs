@@ -94,6 +94,11 @@ impl ProgressReporter {
         self.emit(true);
     }
 
+    pub fn start_file(&self, label: &str) {
+        *self.lock_string(&self.inner.message) = format!("正在下载 {label}");
+        self.emit(true);
+    }
+
     pub fn add_bytes(&self, bytes: u64) {
         if bytes == 0 {
             return;
@@ -494,6 +499,7 @@ async fn download_file(
     if force_redownload {
         let _ = fs::remove_file(&item.destination).await;
     }
+    reporter.start_file(&item.label);
     let part = part_path(&item.destination);
     if force_redownload {
         let _ = fs::remove_file(&part).await;
@@ -504,7 +510,16 @@ async fn download_file(
 
     let mut last_error = None;
     for attempt in 1..=3 {
-        match download_attempt(client, item, mirror, &part, reporter).await {
+        let attempt_mirror = if attempt == 2 {
+            if mirror == "official" {
+                "bmclapi"
+            } else {
+                "official"
+            }
+        } else {
+            mirror
+        };
+        match download_attempt(client, item, attempt_mirror, &part, reporter).await {
             Ok(()) => {
                 publish_part(&part, &item.destination, item).await?;
                 reporter.complete_file(&item.label);

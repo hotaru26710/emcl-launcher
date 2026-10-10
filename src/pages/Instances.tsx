@@ -208,7 +208,7 @@ export function Instances() {
             {submitting ? (
               <div className="mt-5">
                 {creationProgress ? (
-                  <InstallProgressCard progress={creationProgress} compact />
+                  <InstallProgressCard progress={creationProgress} />
                 ) : (
                   <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4 text-sm text-cyan-100">
                     正在创建实例目录...

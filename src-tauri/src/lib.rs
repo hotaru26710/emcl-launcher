@@ -28,6 +28,7 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
     let http = Client::builder()
         .user_agent("EMCL-Launcher/0.1.0")
         .connect_timeout(Duration::from_secs(8))
+        .read_timeout(Duration::from_secs(30))
         .timeout(Duration::from_secs(300))
         .pool_max_idle_per_host(32)
         .build()?;
