@@ -56,6 +56,14 @@ pub fn check_instance_conflicts(
     Ok(findings)
 }
 
+pub fn clear_conflict_reports(connection: &Connection, instance_id: &str) -> Result<()> {
+    connection.execute(
+        "DELETE FROM conflict_reports WHERE instance_id = ?1",
+        params![instance_id],
+    )?;
+    Ok(())
+}
+
 pub fn list_conflict_reports(
     connection: &Connection,
     instance_id: &str,

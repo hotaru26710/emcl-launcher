@@ -5,6 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 use crate::core::community;
+use crate::core::conflict::ConflictFinding;
 use crate::core::install::{self, ProgressReporter};
 use crate::core::instance as instance_core;
 use crate::AppState;
@@ -98,9 +99,32 @@ pub async fn repair_instance_dependencies(
         let instance = instance_core::get_instance(&connection, &instance_id)
             .map_err(|error| error.to_string())?
             .ok_or_else(|| "实例不存在".to_string())?;
-        let findings =
+        let mut findings =
             crate::core::conflict::check_instance_conflicts(&connection, &instance, None)
                 .map_err(|error| error.to_string())?;
+        let reports = crate::core::conflict::list_conflict_reports(&connection, &instance_id)
+            .map_err(|error| error.to_string())?;
+        let mut seen_targets = findings
+            .iter()
+            .filter(|finding| finding.conflict_type == "missing_dependency")
+            .filter_map(|finding| finding.target_mod_id.as_deref())
+            .map(str::to_ascii_lowercase)
+            .collect::<std::collections::HashSet<_>>();
+        for report in reports.into_iter().filter(|report| {
+            report.conflict_type == "missing_dependency" && report.target_mod_id.is_some()
+        }) {
+            let target = report.target_mod_id.clone().unwrap_or_default();
+            if seen_targets.insert(target.to_ascii_lowercase()) {
+                findings.push(ConflictFinding {
+                    severity: report.severity,
+                    conflict_type: report.conflict_type,
+                    source_mod_id: report.source_mod_id,
+                    target_mod_id: report.target_mod_id,
+                    detail: report.detail,
+                    suggestion: report.suggestion,
+                });
+            }
+        }
         (instance, findings)
     };
 
@@ -130,6 +154,10 @@ pub async fn repair_instance_dependencies(
     result.remaining =
         crate::core::conflict::check_instance_conflicts(&connection, &instance, None)
             .map_err(|error| error.to_string())?;
+    if result.remaining.is_empty() {
+        crate::core::conflict::clear_conflict_reports(&connection, &instance.id)
+            .map_err(|error| error.to_string())?;
+    }
     reporter.finish(if result.failed.is_empty() {
         "依赖补全完成"
     } else {
