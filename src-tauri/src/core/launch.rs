@@ -64,6 +64,8 @@ pub fn build_command(
     if !client_jar.is_file() {
         bail!("客户端文件尚未安装或路径不正确：{}", client_jar.display());
     }
+    let main_class = details.main_class.clone().context("版本清单没有提供主类")?;
+    let uses_bootstrap_launcher = uses_bootstrap_launcher(&main_class);
 
     let mut classpath_entries = Vec::new();
     for library in &details.libraries {
@@ -81,7 +83,9 @@ pub fn build_command(
             classpath_entries.push(path.to_string_lossy().into_owned());
         }
     }
-    classpath_entries.push(client_jar.to_string_lossy().into_owned());
+    if !uses_bootstrap_launcher {
+        classpath_entries.push(client_jar.to_string_lossy().into_owned());
+    }
     let classpath_separator = if cfg!(windows) { ";" } else { ":" };
     let classpath = classpath_entries.join(classpath_separator);
 
@@ -193,8 +197,6 @@ pub fn build_command(
     if settings.fullscreen && !game_args.iter().any(|argument| argument == "--fullscreen") {
         game_args.push("--fullscreen".to_string());
     }
-
-    let main_class = details.main_class.clone().context("版本清单没有提供主类")?;
 
     let mut command = Command::new(java_path);
     command
@@ -511,6 +513,12 @@ fn substitute(value: &str, substitutions: &HashMap<&str, String>) -> String {
         })
 }
 
+fn uses_bootstrap_launcher(main_class: &str) -> bool {
+    main_class
+        .to_ascii_lowercase()
+        .contains("bootstraplauncher")
+}
+
 fn resolve_relative(root: &Path, relative: &str) -> Result<PathBuf> {
     let relative_path = Path::new(relative);
     if relative_path.is_absolute()
@@ -547,6 +555,14 @@ mod tests {
             ),
             "--username Steve --assetIndex 17"
         );
+    }
+
+    #[test]
+    fn keeps_bootstrap_launcher_client_out_of_classpath() {
+        assert!(uses_bootstrap_launcher(
+            "cpw.mods.bootstraplauncher.BootstrapLauncher"
+        ));
+        assert!(!uses_bootstrap_launcher("net.minecraft.client.main.Main"));
     }
 
     #[test]
