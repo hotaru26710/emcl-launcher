@@ -64,6 +64,11 @@ pub fn run() {
             commands::java::recommend_java,
             commands::settings::get_default_java,
             commands::settings::set_default_java,
+            commands::auth::create_offline_account,
+            commands::auth::list_accounts,
+            commands::auth::delete_account,
+            commands::auth::set_active_account,
+            commands::auth::get_active_account,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

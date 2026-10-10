@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AccountSummary,
   CreateInstanceInput,
   InstallProgress,
   InstallSummary,
@@ -38,6 +39,12 @@ export const api = {
   getDefaultJava: () => invoke<string | null>("get_default_java"),
   setDefaultJava: (javaPath: string | null) =>
     invoke<void>("set_default_java", { javaPath }),
+  listAccounts: () => invoke<AccountSummary[]>("list_accounts"),
+  createOfflineAccount: (username: string) =>
+    invoke<AccountSummary>("create_offline_account", { username }),
+  deleteAccount: (id: string) => invoke<void>("delete_account", { id }),
+  setActiveAccount: (id: string) => invoke<void>("set_active_account", { id }),
+  getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
   installVersion: (input: InstallVersionInput) =>
     invoke<InstallSummary>("install_version", { input }),
   onInstallProgress: (callback: (progress: InstallProgress) => void): Promise<UnlistenFn> =>

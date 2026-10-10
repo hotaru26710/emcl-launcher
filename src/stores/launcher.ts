@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, errorMessage } from "../api/tauri";
 import type {
+  AccountSummary,
   CreateInstanceInput,
   InstallProgress,
   Instance,
@@ -39,6 +40,11 @@ interface LauncherStore {
   saveDefaultJava: (javaPath: string | null) => Promise<void>;
   javaInstallations: JavaInstallation[];
   detectJava: () => Promise<JavaInstallation[]>;
+  accounts: AccountSummary[];
+  refreshAccounts: () => Promise<void>;
+  createOfflineAccount: (username: string) => Promise<AccountSummary>;
+  setActiveAccount: (id: string) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
   startInstall: (versionId: string, instanceId?: string | null) => Promise<void>;
   setInstallProgress: (progress: InstallProgress) => void;
   clearActiveInstall: () => void;
@@ -60,6 +66,7 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
   manifest: null,
   settings: null,
   javaInstallations: [],
+  accounts: [],
   loadingInstances: false,
   loadingManifest: false,
   savingSettings: false,
@@ -71,15 +78,17 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
     if (get().initialized || get().initializing) return;
     set({ initializing: true, lastError: null });
     try {
-      const [settings, instances, manifest] = await Promise.all([
+      const [settings, instances, manifest, accounts] = await Promise.all([
         api.getSettings(),
         api.listInstances(),
         api.getVersionManifest(false),
+        api.listAccounts(),
       ]);
       set({
         settings,
         instances,
         manifest,
+        accounts,
         initialized: true,
         initializing: false,
       });
@@ -182,6 +191,48 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
       const javaInstallations = await api.detectJava();
       set({ javaInstallations, lastError: null });
       return javaInstallations;
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
+  refreshAccounts: async () => {
+    try {
+      const accounts = await api.listAccounts();
+      set({ accounts, lastError: null });
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
+  createOfflineAccount: async (username) => {
+    try {
+      const account = await api.createOfflineAccount(username);
+      const accounts = await api.listAccounts();
+      set({ accounts, lastError: null });
+      return account;
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
+  setActiveAccount: async (id) => {
+    try {
+      await api.setActiveAccount(id);
+      await get().refreshAccounts();
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
+  deleteAccount: async (id) => {
+    try {
+      await api.deleteAccount(id);
+      await get().refreshAccounts();
     } catch (error) {
       set({ lastError: errorMessage(error) });
       throw error;

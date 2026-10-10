@@ -43,6 +43,31 @@ pub struct UpdateInstanceInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AccountSummary {
+    pub id: String,
+    pub username: String,
+    pub uuid: String,
+    pub account_type: String,
+    pub expires_at: Option<String>,
+    pub created_at: String,
+    pub active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredAccount {
+    pub id: String,
+    pub username: String,
+    pub uuid: String,
+    pub account_type: String,
+    pub access_token: Option<String>,
+    pub refresh_token: Option<String>,
+    pub expires_at: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub download_mirror: String,
     pub download_concurrency: u32,

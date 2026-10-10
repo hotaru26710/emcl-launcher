@@ -98,6 +98,16 @@ export interface Settings {
   dataDirectory: string;
 }
 
+export interface AccountSummary {
+  id: string;
+  username: string;
+  uuid: string;
+  accountType: "offline" | "microsoft" | string;
+  expiresAt?: string | null;
+  createdAt: string;
+  active: boolean;
+}
+
 export interface JavaInstallation {
   path: string;
   javaHome?: string | null;
