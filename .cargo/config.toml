@@ -1,0 +1,4 @@
+# The environment used during development can have Windows CRL services blocked.
+# Keep Cargo usable without changing the machine-wide certificate configuration.
+[http]
+check-revoke = false
