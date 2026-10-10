@@ -79,6 +79,10 @@ pub fn run() {
             commands::launch::stop_instance,
             commands::launch::is_instance_running,
             commands::loader::install_loader,
+            commands::mods::list_mods,
+            commands::mods::install_mods,
+            commands::mods::toggle_mod,
+            commands::mods::delete_mod,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

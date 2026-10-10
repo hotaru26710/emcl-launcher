@@ -6,15 +6,19 @@ import {
   FolderOpen,
   HardDrive,
   MemoryStick,
+  Package,
   Play,
+  Power,
+  PowerOff,
   Save,
   Square,
   Terminal,
   Trash2,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api } from "../api/tauri";
-import type { Instance, JavaRecommendation } from "../api/types";
+import type { Instance, JavaRecommendation, ModInfo } from "../api/types";
 import { InstallProgressCard } from "../components/ProgressBar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
@@ -47,6 +51,8 @@ export function InstanceDetail() {
   const [javaPath, setJavaPath] = useState(instance?.javaPath ?? "");
   const [recommendation, setRecommendation] = useState<JavaRecommendation | null>(null);
   const [detectingJava, setDetectingJava] = useState(false);
+  const [mods, setMods] = useState<ModInfo[]>([]);
+  const [loadingMods, setLoadingMods] = useState(false);
   const [saving, setSaving] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +112,46 @@ export function InstanceDetail() {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [logs.length]);
+
+  useEffect(() => {
+    if (!instance?.id) return;
+    let disposed = false;
+    setLoadingMods(true);
+    void api
+      .listMods(instance.id)
+      .then((next) => {
+        if (!disposed) setMods(next);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!disposed) setLoadingMods(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [instance?.id]);
+
+  useEffect(() => {
+    if (!instance?.id) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        void api
+          .installMods(instance.id, event.payload.paths)
+          .then(setMods)
+          .catch(() => undefined);
+      })
+      .then((stopListening) => {
+        if (disposed) stopListening();
+        else unlisten = stopListening;
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [instance?.id]);
 
   if (!id || (!loading && !instance)) {
     return (
@@ -387,6 +433,70 @@ export function InstanceDetail() {
             <p className="mt-3 text-xs leading-5 text-slate-600">
               mods、config、saves 和日志都隔离在这个目录内。
             </p>
+          </div>
+
+          <div className="glass-panel rounded-[28px] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <Package size={16} />
+                模组
+              </div>
+              <StatusPill tone={mods.length > 0 ? "cyan" : "slate"}>{`${mods.length} 个`}</StatusPill>
+            </div>
+            <div className="mt-3 rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.035] px-4 py-4 text-center text-xs leading-5 text-slate-500">
+              将 `.jar` 模组拖到窗口里即可安装；安装后启停只需重命名文件。
+            </div>
+            {loadingMods ? (
+              <div className="mt-4 text-center text-xs text-slate-600">正在读取模组...</div>
+            ) : mods.length === 0 ? (
+              <div className="mt-4 text-center text-xs text-slate-700">当前实例还没有模组。</div>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {mods.map((mod) => (
+                  <div
+                    key={mod.fileName}
+                    className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-slate-950/30 px-3 py-3"
+                  >
+                    <div className={[
+                      "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+                      mod.enabled ? "bg-cyan-300/10 text-cyan-200" : "bg-slate-800 text-slate-600",
+                    ].join(" ")}>
+                      <Package size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-medium text-slate-200">{mod.name}</div>
+                      <div className="mt-0.5 truncate font-mono text-[10px] text-slate-600">
+                        {[mod.version, mod.loader, mod.fileName].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void api
+                          .toggleMod(instance.id, mod.fileName, !mod.enabled)
+                          .then(setMods)
+                          .catch(() => undefined)
+                      }
+                      className="rounded-lg p-2 text-slate-500 transition hover:bg-white/5 hover:text-cyan-200"
+                      aria-label={mod.enabled ? "禁用模组" : "启用模组"}
+                    >
+                      {mod.enabled ? <Power size={15} /> : <PowerOff size={15} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!window.confirm(`确定删除模组“${mod.name}”吗？`)) return;
+                        void api.deleteMod(instance.id, mod.fileName).then(setMods).catch(() => undefined);
+                      }}
+                      className="rounded-lg p-2 text-slate-600 transition hover:bg-rose-400/10 hover:text-rose-300"
+                      aria-label="删除模组"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="glass-panel hover-lift rounded-[28px] p-5">

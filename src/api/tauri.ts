@@ -9,6 +9,7 @@ import type {
   InstallSummary,
   InstallVersionInput,
   LoaderInstallResult,
+  ModInfo,
   Instance,
   JavaInstallation,
   JavaRecommendation,
@@ -61,6 +62,13 @@ export const api = {
     invoke<InstallSummary>("install_version", { input }),
   installLoader: (input: InstallLoaderInput) =>
     invoke<LoaderInstallResult>("install_loader", { input }),
+  listMods: (instanceId: string) => invoke<ModInfo[]>("list_mods", { instanceId }),
+  installMods: (instanceId: string, paths: string[]) =>
+    invoke<ModInfo[]>("install_mods", { instanceId, paths }),
+  toggleMod: (instanceId: string, fileName: string, enabled: boolean) =>
+    invoke<ModInfo[]>("toggle_mod", { instanceId, fileName, enabled }),
+  deleteMod: (instanceId: string, fileName: string) =>
+    invoke<ModInfo[]>("delete_mod", { instanceId, fileName }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),

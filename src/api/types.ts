@@ -114,6 +114,16 @@ export interface InstallLoaderInput {
   loaderVersion?: string | null;
 }
 
+export interface ModInfo {
+  fileName: string;
+  name: string;
+  modId?: string | null;
+  version?: string | null;
+  loader?: string | null;
+  description?: string | null;
+  enabled: boolean;
+}
+
 export interface AccountSummary {
   id: string;
   username: string;
