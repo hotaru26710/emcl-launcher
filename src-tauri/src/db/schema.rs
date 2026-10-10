@@ -103,6 +103,17 @@ fn seed_settings(connection: &Connection) -> Result<()> {
             DEFAULT_DOWNLOAD_CONCURRENCY.to_string()
         ],
     )?;
+    for (key, value) in [
+        ("default_memory_mb", "4096"),
+        ("game_width", "854"),
+        ("game_height", "480"),
+        ("fullscreen", "false"),
+    ] {
+        connection.execute(
+            "INSERT OR IGNORE INTO settings (key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )?;
+    }
     Ok(())
 }
 

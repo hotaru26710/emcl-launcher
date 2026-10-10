@@ -5,6 +5,7 @@ import {
   Database,
   FolderOpen,
   Cpu,
+  Gamepad2,
   Gauge,
   Globe2,
   RefreshCw,
@@ -26,6 +27,10 @@ export function SettingsPage() {
   const [concurrency, setConcurrency] = useState(8);
   const [defaultJavaPath, setDefaultJavaPath] = useState<string | null>(null);
   const [microsoftClientId, setMicrosoftClientId] = useState("");
+  const [defaultMemoryMb, setDefaultMemoryMb] = useState(4096);
+  const [gameWidth, setGameWidth] = useState(854);
+  const [gameHeight, setGameHeight] = useState(480);
+  const [fullscreen, setFullscreen] = useState(false);
   const [detectingJava, setDetectingJava] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -35,6 +40,10 @@ export function SettingsPage() {
     setConcurrency(settings.downloadConcurrency);
     setDefaultJavaPath(settings.defaultJavaPath ?? null);
     setMicrosoftClientId(settings.microsoftClientId ?? "");
+    setDefaultMemoryMb(settings.defaultMemoryMb);
+    setGameWidth(settings.gameWidth);
+    setGameHeight(settings.gameHeight);
+    setFullscreen(settings.fullscreen);
   }, [settings]);
 
   const save = async () => {
@@ -44,6 +53,10 @@ export function SettingsPage() {
         downloadMirror: mirror,
         downloadConcurrency: concurrency,
         microsoftClientId,
+        defaultMemoryMb,
+        gameWidth,
+        gameHeight,
+        fullscreen,
       });
       await saveDefaultJava(defaultJavaPath);
       setSaved(true);
@@ -126,6 +139,71 @@ export function SettingsPage() {
           <p className="mt-3 text-xs text-slate-600">
             资源文件很多，默认 8 个并发请求；网络不稳时可调低。
           </p>
+        </section>
+
+        <section className="glass-panel hover-lift rounded-[28px] p-5">
+          <div className="flex items-center gap-2">
+            <Gamepad2 size={17} className="text-cyan-300" />
+            <h2 className="text-sm font-semibold text-slate-200">游戏默认值</h2>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            新建实例时使用这些默认值；实例详情页仍可单独覆盖内存和 JVM 参数。
+          </p>
+          <div className="mt-4 space-y-4">
+            <label className="block">
+              <span className="text-xs text-slate-500">默认内存上限</span>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={512}
+                  max={32768}
+                  step={512}
+                  value={defaultMemoryMb}
+                  onChange={(event) => setDefaultMemoryMb(Number(event.currentTarget.value))}
+                  className="h-1.5 flex-1 accent-cyan-400"
+                />
+                <span className="w-24 rounded-lg border border-white/8 bg-slate-950/55 px-2 py-1 text-center text-xs tabular-nums text-slate-300">
+                  {defaultMemoryMb} MB
+                </span>
+              </div>
+            </label>
+            <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
+              <label>
+                <span className="text-xs text-slate-500">窗口宽度</span>
+                <input
+                  type="number"
+                  min={320}
+                  max={7680}
+                  value={gameWidth}
+                  onChange={(event) => setGameWidth(Number(event.currentTarget.value))}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40"
+                />
+              </label>
+              <label>
+                <span className="text-xs text-slate-500">窗口高度</span>
+                <input
+                  type="number"
+                  min={240}
+                  max={4320}
+                  value={gameHeight}
+                  onChange={(event) => setGameHeight(Number(event.currentTarget.value))}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setFullscreen((value) => !value)}
+                className={[
+                  "mb-0.5 rounded-xl border px-3.5 py-2.5 text-xs font-medium transition",
+                  fullscreen
+                    ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-200"
+                    : "border-white/8 bg-white/5 text-slate-400",
+                ].join(" ")}
+              >
+                {fullscreen ? "全屏" : "窗口"}
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="glass-panel hover-lift rounded-[28px] p-5">

@@ -67,6 +67,38 @@ pub fn update_settings(
         )
         .map_err(|error| error.to_string())?;
     }
+    if let Some(memory) = input.default_memory_mb {
+        set_setting(
+            &connection,
+            "default_memory_mb",
+            &memory.clamp(512, 65536).to_string(),
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    if let Some(width) = input.game_width {
+        set_setting(
+            &connection,
+            "game_width",
+            &width.clamp(320, 7680).to_string(),
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    if let Some(height) = input.game_height {
+        set_setting(
+            &connection,
+            "game_height",
+            &height.clamp(240, 4320).to_string(),
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    if let Some(fullscreen) = input.fullscreen {
+        set_setting(
+            &connection,
+            "fullscreen",
+            if fullscreen { "true" } else { "false" },
+        )
+        .map_err(|error| error.to_string())?;
+    }
     if let Some(client_id) = input.microsoft_client_id {
         if client_id.trim().is_empty() {
             connection
@@ -91,12 +123,34 @@ fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow
         .clamp(1, 16);
     let default_java_path = get_setting(connection, "default_java_path")?;
     let microsoft_client_id = get_setting(connection, "microsoft_client_id")?;
+    let default_memory_mb = get_setting(connection, "default_memory_mb")?
+        .unwrap_or_else(|| "4096".to_string())
+        .parse::<u32>()
+        .context("invalid default memory setting")?
+        .clamp(512, 65536);
+    let game_width = get_setting(connection, "game_width")?
+        .unwrap_or_else(|| "854".to_string())
+        .parse::<u32>()
+        .context("invalid game width setting")?
+        .clamp(320, 7680);
+    let game_height = get_setting(connection, "game_height")?
+        .unwrap_or_else(|| "480".to_string())
+        .parse::<u32>()
+        .context("invalid game height setting")?
+        .clamp(240, 4320);
+    let fullscreen = get_setting(connection, "fullscreen")?
+        .map(|value| value == "true")
+        .unwrap_or(false);
 
     Ok(Settings {
         download_mirror: mirror,
         download_concurrency: concurrency,
         default_java_path,
         microsoft_client_id,
+        default_memory_mb,
+        game_width,
+        game_height,
+        fullscreen,
         shared_directory: state.paths.shared_dir().to_string_lossy().into_owned(),
         data_directory: state.paths.root().to_string_lossy().into_owned(),
     })

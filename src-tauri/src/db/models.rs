@@ -73,6 +73,10 @@ pub struct Settings {
     pub download_concurrency: u32,
     pub default_java_path: Option<String>,
     pub microsoft_client_id: Option<String>,
+    pub default_memory_mb: u32,
+    pub game_width: u32,
+    pub game_height: u32,
+    pub fullscreen: bool,
     pub shared_directory: String,
     pub data_directory: String,
 }
@@ -83,6 +87,10 @@ pub struct UpdateSettingsInput {
     pub download_mirror: Option<String>,
     pub download_concurrency: Option<u32>,
     pub microsoft_client_id: Option<String>,
+    pub default_memory_mb: Option<u32>,
+    pub game_width: Option<u32>,
+    pub game_height: Option<u32>,
+    pub fullscreen: Option<bool>,
 }
 
 pub fn now_rfc3339() -> String {

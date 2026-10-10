@@ -127,8 +127,8 @@ pub fn build_command(
     substitutions.insert("user_properties", "{}".to_string());
     substitutions.insert("clientid", String::new());
     substitutions.insert("auth_xuid", String::new());
-    substitutions.insert("resolution_width", "854".to_string());
-    substitutions.insert("resolution_height", "480".to_string());
+    substitutions.insert("resolution_width", settings.game_width.to_string());
+    substitutions.insert("resolution_height", settings.game_height.to_string());
     substitutions.insert("quickPlayPath", String::new());
 
     let mut jvm_args = vec![
@@ -166,7 +166,7 @@ pub fn build_command(
         );
     }
 
-    let game_args = if let Some(arguments) = &details.arguments {
+    let mut game_args = if let Some(arguments) = &details.arguments {
         expand_arguments(&arguments.game, &substitutions)
     } else if let Some(legacy) = &details.minecraft_arguments {
         shell_words::split(legacy)
@@ -177,6 +177,9 @@ pub fn build_command(
     } else {
         Vec::new()
     };
+    if settings.fullscreen && !game_args.iter().any(|argument| argument == "--fullscreen") {
+        game_args.push("--fullscreen".to_string());
+    }
 
     let main_class = details.main_class.clone().context("版本清单没有提供主类")?;
 
@@ -189,7 +192,6 @@ pub fn build_command(
         .args(jvm_args)
         .arg(main_class)
         .args(game_args);
-    let _ = settings;
     Ok(command)
 }
 

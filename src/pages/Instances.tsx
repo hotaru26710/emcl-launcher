@@ -20,6 +20,7 @@ import { useLauncherStore } from "../stores/launcher";
 export function Instances() {
   const instances = useLauncherStore((state) => state.instances);
   const manifest = useLauncherStore((state) => state.manifest);
+  const settings = useLauncherStore((state) => state.settings);
   const loading = useLauncherStore((state) => state.loadingInstances);
   const createInstance = useLauncherStore((state) => state.createInstance);
   const deleteInstance = useLauncherStore((state) => state.deleteInstance);
@@ -38,7 +39,8 @@ export function Instances() {
     if (!dialogOpen) return;
     const fallback = manifest?.latest.release ?? "1.21.1";
     setVersionId((current) => current || fallback);
-  }, [dialogOpen, manifest]);
+    if (settings?.defaultMemoryMb) setMemoryMb(settings.defaultMemoryMb);
+  }, [dialogOpen, manifest, settings?.defaultMemoryMb]);
 
   const handleCreate = async () => {
     if (!name.trim()) return;

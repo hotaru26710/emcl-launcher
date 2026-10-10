@@ -95,6 +95,10 @@ export interface Settings {
   downloadConcurrency: number;
   defaultJavaPath?: string | null;
   microsoftClientId?: string | null;
+  defaultMemoryMb: number;
+  gameWidth: number;
+  gameHeight: number;
+  fullscreen: boolean;
   sharedDirectory: string;
   dataDirectory: string;
 }
@@ -169,6 +173,10 @@ export interface UpdateSettingsInput {
   downloadMirror?: string;
   downloadConcurrency?: number;
   microsoftClientId?: string;
+  defaultMemoryMb?: number;
+  gameWidth?: number;
+  gameHeight?: number;
+  fullscreen?: boolean;
 }
 
 export interface InstallVersionInput {
