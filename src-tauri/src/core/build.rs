@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
@@ -56,12 +57,14 @@ pub async fn build_project(app: AppHandle, project: &Project) -> Result<()> {
         .with_context(|| format!("无法执行 {}", gradlew.display()))?;
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
+    let tail = Arc::new(Mutex::new(Vec::<String>::new()));
     if let Some(stdout) = stdout {
         tokio::spawn(pump_build_output(
             app.clone(),
             project.id.clone(),
             "stdout",
             stdout,
+            tail.clone(),
         ));
     }
     if let Some(stderr) = stderr {
@@ -70,6 +73,7 @@ pub async fn build_project(app: AppHandle, project: &Project) -> Result<()> {
             project.id.clone(),
             "stderr",
             stderr,
+            tail.clone(),
         ));
     }
     let status = child.wait().await?;
@@ -82,7 +86,11 @@ pub async fn build_project(app: AppHandle, project: &Project) -> Result<()> {
         },
     );
     if !status.success() {
-        bail!("Gradle 构建失败，退出码 {:?}", status.code());
+        let tail = tail
+            .lock()
+            .map(|lines| lines.join("\n"))
+            .unwrap_or_default();
+        bail!("Gradle 构建失败，退出码 {:?}\n{}", status.code(), tail);
     }
 
     Ok(())
@@ -93,9 +101,16 @@ async fn pump_build_output<R: AsyncRead + Unpin>(
     project_id: String,
     stream: &'static str,
     reader: R,
+    tail: Arc<Mutex<Vec<String>>>,
 ) {
     let mut lines = BufReader::new(reader).lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        if let Ok(mut tail) = tail.lock() {
+            tail.push(line.clone());
+            if tail.len() > 80 {
+                tail.remove(0);
+            }
+        }
         let _ = app.emit(
             "project-build-log",
             ProjectBuildLog {
