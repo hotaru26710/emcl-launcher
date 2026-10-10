@@ -131,6 +131,13 @@ export function CommunityMods() {
 
   const install = async (version: ModrinthVersionInfo) => {
     if (!instance) return;
+    if (
+      !window.confirm(
+        "安装时会自动检查并下载这个模组的必需依赖；实例里已经存在的依赖文件会跳过，不会重复下载。是否继续？",
+      )
+    ) {
+      return;
+    }
     setInstalling(version.id);
     setMessage("");
     try {
