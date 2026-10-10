@@ -23,7 +23,14 @@ pub enum ModPlatform {
     CurseForge,
 }
 
-impl ModPlatform {}
+impl ModPlatform {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Modrinth => "modrinth",
+            Self::CurseForge => "curseforge",
+        }
+    }
+}
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
