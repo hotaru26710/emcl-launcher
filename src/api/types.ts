@@ -94,6 +94,7 @@ export interface Settings {
   downloadMirror: "official" | "bmclapi" | string;
   downloadConcurrency: number;
   defaultJavaPath?: string | null;
+  microsoftClientId?: string | null;
   sharedDirectory: string;
   dataDirectory: string;
 }
@@ -106,6 +107,21 @@ export interface AccountSummary {
   expiresAt?: string | null;
   createdAt: string;
   active: boolean;
+}
+
+export interface DeviceCodeResponse {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+  message: string;
+}
+
+export interface MicrosoftPollResult {
+  status: string;
+  message: string;
+  account?: AccountSummary | null;
 }
 
 export interface JavaInstallation {
@@ -127,6 +143,7 @@ export interface JavaRecommendation {
 export interface UpdateSettingsInput {
   downloadMirror?: string;
   downloadConcurrency?: number;
+  microsoftClientId?: string;
 }
 
 export interface InstallVersionInput {

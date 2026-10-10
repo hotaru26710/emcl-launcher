@@ -67,6 +67,16 @@ pub fn update_settings(
         )
         .map_err(|error| error.to_string())?;
     }
+    if let Some(client_id) = input.microsoft_client_id {
+        if client_id.trim().is_empty() {
+            connection
+                .execute("DELETE FROM settings WHERE key = 'microsoft_client_id'", [])
+                .map_err(|error| error.to_string())?;
+        } else {
+            set_setting(&connection, "microsoft_client_id", client_id.trim())
+                .map_err(|error| error.to_string())?;
+        }
+    }
 
     settings_from_connection(&state, &connection).map_err(|error| error.to_string())
 }
@@ -80,11 +90,13 @@ fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow
         .context("invalid download concurrency setting")?
         .clamp(1, 16);
     let default_java_path = get_setting(connection, "default_java_path")?;
+    let microsoft_client_id = get_setting(connection, "microsoft_client_id")?;
 
     Ok(Settings {
         download_mirror: mirror,
         download_concurrency: concurrency,
         default_java_path,
+        microsoft_client_id,
         shared_directory: state.paths.shared_dir().to_string_lossy().into_owned(),
         data_directory: state.paths.root().to_string_lossy().into_owned(),
     })

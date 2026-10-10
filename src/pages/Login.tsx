@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   LogIn,
@@ -7,6 +7,8 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
+import { api, errorMessage } from "../api/tauri";
+import type { DeviceCodeResponse } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
@@ -17,8 +19,63 @@ export function Login() {
   const createOfflineAccount = useLauncherStore((state) => state.createOfflineAccount);
   const setActiveAccount = useLauncherStore((state) => state.setActiveAccount);
   const deleteAccount = useLauncherStore((state) => state.deleteAccount);
+  const refreshAccounts = useLauncherStore((state) => state.refreshAccounts);
+  const settings = useLauncherStore((state) => state.settings);
   const [username, setUsername] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deviceCode, setDeviceCode] = useState<DeviceCodeResponse | null>(null);
+  const [microsoftMessage, setMicrosoftMessage] = useState("");
+  const [microsoftError, setMicrosoftError] = useState("");
+
+  useEffect(() => {
+    if (!deviceCode) return;
+    let stopped = false;
+    let timer = 0;
+
+    const poll = async () => {
+      try {
+        const result = await api.pollMicrosoftLogin(deviceCode.deviceCode);
+        if (stopped) return;
+        setMicrosoftMessage(result.message);
+        if (result.status === "success") {
+          setDeviceCode(null);
+          setMicrosoftError("");
+          await refreshAccounts();
+          return;
+        }
+        if (result.status === "authorization_pending" || result.status === "slow_down") {
+          timer = window.setTimeout(poll, Math.max(2, deviceCode.interval) * 1000);
+          return;
+        }
+        setMicrosoftError(result.message);
+        setDeviceCode(null);
+      } catch (error) {
+        if (!stopped) {
+          setMicrosoftError(errorMessage(error));
+          setDeviceCode(null);
+        }
+      }
+    };
+
+    timer = window.setTimeout(poll, Math.max(2, deviceCode.interval) * 1000);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [deviceCode, refreshAccounts]);
+
+  const startMicrosoft = async () => {
+    setMicrosoftError("");
+    setMicrosoftMessage("正在向 Microsoft 申请设备码...");
+    try {
+      const response = await api.startMicrosoftLogin();
+      setDeviceCode(response);
+      setMicrosoftMessage(response.message);
+    } catch (error) {
+      setMicrosoftError(errorMessage(error));
+      setMicrosoftMessage("");
+    }
+  };
 
   const createOffline = async () => {
     if (!username.trim()) return;
@@ -82,12 +139,40 @@ export function Login() {
           </p>
           <button
             type="button"
-            disabled
-            className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/8 bg-white/5 px-4 py-2.5 text-sm text-slate-500"
+            disabled={!settings?.microsoftClientId || Boolean(deviceCode)}
+            onClick={() => void startMicrosoft()}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-white disabled:opacity-40"
           >
             <LogIn size={16} />
-            第 8 步接入
+            {deviceCode ? "等待授权" : "使用微软登录"}
           </button>
+          {!settings?.microsoftClientId ? (
+            <p className="mt-3 text-xs leading-5 text-amber-200/70">
+              需要先在设置页填写 Azure Application (client) ID。
+            </p>
+          ) : null}
+          {deviceCode ? (
+            <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.055] p-4">
+              <div className="text-xs text-slate-500">在微软页面输入设备码</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[0.18em] text-cyan-100">
+                {deviceCode.userCode}
+              </div>
+              <a
+                href={deviceCode.verificationUri}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block break-all text-xs text-cyan-300 hover:text-cyan-200"
+              >
+                {deviceCode.verificationUri}
+              </a>
+            </div>
+          ) : null}
+          {microsoftMessage ? (
+            <p className="mt-3 text-xs leading-5 text-slate-500">{microsoftMessage}</p>
+          ) : null}
+          {microsoftError ? (
+            <p className="mt-3 text-xs leading-5 text-rose-300">{microsoftError}</p>
+          ) : null}
         </section>
       </div>
 

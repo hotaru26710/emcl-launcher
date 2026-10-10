@@ -8,6 +8,7 @@ import {
   Gauge,
   Globe2,
   RefreshCw,
+  ShieldCheck,
   Save,
 } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
@@ -24,6 +25,7 @@ export function SettingsPage() {
   const [mirror, setMirror] = useState<"official" | "bmclapi">("official");
   const [concurrency, setConcurrency] = useState(8);
   const [defaultJavaPath, setDefaultJavaPath] = useState<string | null>(null);
+  const [microsoftClientId, setMicrosoftClientId] = useState("");
   const [detectingJava, setDetectingJava] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -32,12 +34,17 @@ export function SettingsPage() {
     setMirror(settings.downloadMirror === "bmclapi" ? "bmclapi" : "official");
     setConcurrency(settings.downloadConcurrency);
     setDefaultJavaPath(settings.defaultJavaPath ?? null);
+    setMicrosoftClientId(settings.microsoftClientId ?? "");
   }, [settings]);
 
   const save = async () => {
     setSaved(false);
     try {
-      await saveSettings({ downloadMirror: mirror, downloadConcurrency: concurrency });
+      await saveSettings({
+        downloadMirror: mirror,
+        downloadConcurrency: concurrency,
+        microsoftClientId,
+      });
       await saveDefaultJava(defaultJavaPath);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2000);
@@ -119,6 +126,22 @@ export function SettingsPage() {
           <p className="mt-3 text-xs text-slate-600">
             资源文件很多，默认 8 个并发请求；网络不稳时可调低。
           </p>
+        </section>
+
+        <section className="glass-panel hover-lift rounded-[28px] p-5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={17} className="text-cyan-300" />
+            <h2 className="text-sm font-semibold text-slate-200">Microsoft 登录</h2>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            微软设备码登录需要你自己在 Azure 注册的公共客户端应用 ID。留空时只会禁用微软登录，不影响离线账户。
+          </p>
+          <input
+            value={microsoftClientId}
+            onChange={(event) => setMicrosoftClientId(event.currentTarget.value.trim())}
+            placeholder="Azure Application (client) ID"
+            className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
+          />
         </section>
 
         <section className="glass-panel hover-lift rounded-[28px] p-5">

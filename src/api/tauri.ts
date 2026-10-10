@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AccountSummary,
   CreateInstanceInput,
+  DeviceCodeResponse,
   InstallProgress,
   InstallSummary,
   InstallVersionInput,
@@ -11,6 +12,7 @@ import type {
   JavaRecommendation,
   LauncherInfo,
   LaunchExit,
+  MicrosoftPollResult,
   LaunchLog,
   LaunchResult,
   Settings,
@@ -48,6 +50,11 @@ export const api = {
   deleteAccount: (id: string) => invoke<void>("delete_account", { id }),
   setActiveAccount: (id: string) => invoke<void>("set_active_account", { id }),
   getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
+  startMicrosoftLogin: () => invoke<DeviceCodeResponse>("start_microsoft_login"),
+  pollMicrosoftLogin: (deviceCode: string) =>
+    invoke<MicrosoftPollResult>("poll_microsoft_login", { deviceCode }),
+  refreshMicrosoftAccount: (id: string) =>
+    invoke<AccountSummary>("refresh_microsoft_account", { id }),
   installVersion: (input: InstallVersionInput) =>
     invoke<InstallSummary>("install_version", { input }),
   launchInstance: (instanceId: string) =>
