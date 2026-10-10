@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -192,6 +194,10 @@ pub fn build_command(
         .args(jvm_args)
         .arg(main_class)
         .args(game_args);
+    #[cfg(windows)]
+    {
+        command.creation_flags(0x0800_0000);
+    }
     Ok(command)
 }
 
@@ -312,9 +318,10 @@ pub fn stop_instance(registry: &ProcessRegistry, instance_id: &str) -> Result<()
 
     #[cfg(windows)]
     if let Some(pid) = pid {
-        let _ = std::process::Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .status();
+        let mut taskkill = std::process::Command::new("taskkill");
+        taskkill.args(["/PID", &pid.to_string(), "/T", "/F"]);
+        taskkill.creation_flags(0x0800_0000);
+        let _ = taskkill.status();
     }
 
     let mut child = process

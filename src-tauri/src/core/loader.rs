@@ -314,13 +314,19 @@ async fn install_installer_loader(
             install_root.to_string_lossy().into_owned(),
         ],
     ] {
-        let output = Command::new(java_path)
+        let mut installer_command = Command::new(java_path);
+        installer_command
             .arg("-jar")
             .arg(&installer_path)
             .args(&arguments)
             .current_dir(&install_root)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(windows)]
+        {
+            installer_command.creation_flags(0x0800_0000);
+        }
+        let output = installer_command
             .output()
             .await
             .with_context(|| format!("无法运行 {} 安装器", loader.as_str()))?;
