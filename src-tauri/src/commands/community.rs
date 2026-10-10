@@ -7,7 +7,6 @@ use uuid::Uuid;
 use crate::core::community;
 use crate::core::install::{self, ProgressReporter};
 use crate::core::instance as instance_core;
-use crate::core::mods::ModInfo;
 use crate::AppState;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -59,7 +58,7 @@ pub async fn install_modrinth_version(
     app: AppHandle,
     state: State<'_, AppState>,
     input: InstallModrinthInput,
-) -> Result<Vec<ModInfo>, String> {
+) -> Result<community::CommunityInstallResult, String> {
     let instance = {
         let connection = state.db.lock().map_err(|error| error.to_string())?;
         instance_core::get_instance(&connection, &input.instance_id)
@@ -85,14 +84,4 @@ pub async fn install_modrinth_version(
         reporter.fail(&message);
         message
     })
-}
-
-#[tauri::command]
-pub async fn list_mcbbs_mods(
-    state: State<'_, AppState>,
-    query: Option<String>,
-) -> Result<Vec<crate::core::community::McbbsThread>, String> {
-    community::list_mcbbs_mods(&state.http, query.as_deref().unwrap_or_default())
-        .await
-        .map_err(|error| error.to_string())
 }

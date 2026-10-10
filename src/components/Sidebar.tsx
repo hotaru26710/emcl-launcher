@@ -16,16 +16,16 @@ const navigation = [
 
 export function Sidebar() {
   return (
-    <aside className="relative z-20 w-[17.5rem] shrink-0 p-3 pr-0">
-      <div className="glass-panel flex h-full flex-col rounded-[30px] px-3 py-4">
+    <aside className="group/sidebar relative z-20 w-20 shrink-0 p-3 pr-0 transition-[width] duration-300 ease-out hover:w-[17.5rem]">
+      <div className="glass-panel flex h-full flex-col rounded-[30px] px-2 py-4 transition-[padding] duration-300 group-hover/sidebar:px-3">
         <div className="group flex items-center gap-3 rounded-3xl border border-white/[0.06] bg-white/[0.025] px-3 py-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_35px_rgba(34,211,238,0.13)] transition duration-500 group-hover:rotate-3 group-hover:scale-105">
             <Waves size={22} />
           </div>
-          <div>
-            <div className="text-base font-semibold tracking-[0.08em] text-white">EMCL</div>
-            <div className="text-[9px] font-medium tracking-[0.25em] text-slate-600">
-              LAUNCHER
+          <div className="w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover/sidebar:w-32 group-hover/sidebar:opacity-100">
+            <div className="whitespace-nowrap text-base font-semibold tracking-[0.08em] text-white">EMCL</div>
+            <div className="whitespace-nowrap text-[9px] font-medium tracking-[0.25em] text-slate-600">
+              EMBER LAUNCHER
             </div>
           </div>
         </div>
@@ -58,8 +58,10 @@ export function Sidebar() {
                       size={18}
                       className="transition-transform duration-300 group-hover:scale-110"
                     />
-                    <span className="flex-1 font-medium">{item.label}</span>
-                    <span className="text-[9px] tracking-[0.16em] text-slate-700 transition group-hover:text-slate-500">
+                    <span className="w-0 flex-1 overflow-hidden whitespace-nowrap font-medium opacity-0 transition-all duration-300 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100">
+                      {item.label}
+                    </span>
+                    <span className="w-0 overflow-hidden text-[9px] tracking-[0.16em] text-slate-700 opacity-0 transition-all duration-300 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100 group-hover:text-slate-500">
                       {item.hint}
                     </span>
                   </>
@@ -69,7 +71,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-auto rounded-3xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-transparent p-4">
+        <div className="mt-auto max-h-0 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-transparent opacity-0 transition-all duration-300 group-hover/sidebar:max-h-40 group-hover/sidebar:p-4 group-hover/sidebar:opacity-100">
           <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
             <span className="animate-soft-pulse h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
             本地模式

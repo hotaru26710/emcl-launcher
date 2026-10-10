@@ -949,6 +949,31 @@ pub async fn download_artifacts(request: ArtifactDownloadRequest<'_>) -> Result<
     download_many(&runtime, stage, message, items).await
 }
 
+pub async fn artifact_file_is_valid(
+    path: &Path,
+    expected_sha1: Option<&str>,
+    expected_size: Option<u64>,
+) -> Result<bool> {
+    if !fs::try_exists(path).await.unwrap_or(false) {
+        return Ok(false);
+    }
+    let metadata = fs::metadata(path).await?;
+    if metadata.len() == 0 {
+        return Ok(false);
+    }
+    if let Some(expected) = expected_size {
+        if metadata.len() != expected {
+            return Ok(false);
+        }
+    }
+    if let Some(expected) = expected_sha1 {
+        if verify_file(path, Some(expected)).await.is_err() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

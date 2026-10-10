@@ -88,7 +88,6 @@ pub fn run() {
             commands::community::search_modrinth_mods,
             commands::community::get_modrinth_versions,
             commands::community::install_modrinth_version,
-            commands::community::list_mcbbs_mods,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

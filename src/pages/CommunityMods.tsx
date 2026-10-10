@@ -9,14 +9,46 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/tauri";
-import type { Instance, McbbsThread, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
+import type { CommunityInstallResult, Instance, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
 import { useLauncherStore } from "../stores/launcher";
 
+const PAGE_SIZE = 20;
+
+const tagLabels: Record<string, string> = {
+  adventure: "冒险",
+  cursed: "搞怪",
+  decoration: "装饰",
+  economy: "经济",
+  equipment: "装备",
+  food: "食物",
+  game_mechanics: "游戏机制",
+  library: "前置库",
+  magic: "魔法",
+  management: "管理",
+  minigame: "小游戏",
+  mobs: "生物",
+  optimization: "性能优化",
+  social: "社交",
+  storage: "存储",
+  technology: "科技",
+  transportation: "交通",
+  utility: "实用工具",
+  worldgen: "世界生成",
+  fabric: "Fabric",
+  quilt: "Quilt",
+  forge: "Forge",
+  neoforge: "NeoForge",
+};
+
 function compactNumber(value: number): string {
   return new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function tagLabel(tag: string): string {
+  return tagLabels[tag] ?? tag;
 }
 
 export function CommunityMods() {
@@ -25,14 +57,12 @@ export function CommunityMods() {
   const [instance, setInstance] = useState<Instance | null>(
     instances.find((item) => item.id === id) ?? null,
   );
-  const [source, setSource] = useState<"modrinth" | "mcbbs">("modrinth");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ModrinthSearchResult[]>([]);
-  const [mcbbsThreads, setMcbbsThreads] = useState<McbbsThread[]>([]);
-  const [mcbbsLoading, setMcbbsLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ModrinthSearchResult | null>(null);
   const [versions, setVersions] = useState<ModrinthVersionInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -47,47 +77,36 @@ export function CommunityMods() {
     void api.getInstance(id).then(setInstance).catch(() => undefined);
   }, [id, instances]);
 
-  const search = async () => {
+  useEffect(() => {
     if (!instance) return;
-    setLoading(true);
-    setSelectedProject(null);
-    setVersions([]);
+    void search(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance?.id]);
+
+  const search = async (reset: boolean) => {
+    if (!instance) return;
+    const offset = reset ? 0 : results.length;
+    if (reset) {
+      setLoading(true);
+      setSelectedProject(null);
+      setVersions([]);
+    } else {
+      setLoadingMore(true);
+    }
     setMessage("");
     try {
       const next = await api.searchModrinthMods({
         query,
         gameVersion: instance.versionId,
         loader: instance.loader,
+        offset,
       });
-      setResults(next);
+      setResults((current) => (reset ? next : [...current, ...next]));
     } catch (error) {
       setMessage(String(error));
     } finally {
       setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!instance) return;
-    if (source === "modrinth") {
-      void search();
-    } else {
-      void searchMcbbs();
-    }
-    // Intentionally reload when the source or instance changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instance?.id, source]);
-
-  const searchMcbbs = async () => {
-    setMcbbsLoading(true);
-    setMessage("");
-    try {
-      const threads = await api.listMcbbsMods(query);
-      setMcbbsThreads(threads);
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setMcbbsLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -115,11 +134,14 @@ export function CommunityMods() {
     setInstalling(version.id);
     setMessage("");
     try {
-      const mods = await api.installModrinthVersion({
+      const result: CommunityInstallResult = await api.installModrinthVersion({
         instanceId: instance.id,
         versionId: version.id,
       });
-      setMessage(`已安装 ${version.name}，当前实例模组数：${mods.length}`);
+      setMessage(
+        `安装完成：新增 ${result.installed} 个，跳过 ${result.skipped} 个已存在文件。` +
+          (result.dependencies.length > 1 ? ` 已处理 ${result.dependencies.length} 个文件。` : ""),
+      );
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -130,6 +152,9 @@ export function CommunityMods() {
   if (!instance) {
     return <div className="text-sm text-slate-500">正在读取实例...</div>;
   }
+
+  const recommended = versions.find((version) => version.recommended) ?? versions[0];
+  const canLoadMore = results.length > 0 && results.length % PAGE_SIZE === 0;
 
   return (
     <div className="animate-page mx-auto max-w-6xl">
@@ -142,34 +167,11 @@ export function CommunityMods() {
       </Link>
 
       <PageHeader
-        title="社区模组"
+        title="Modrinth 社区模组"
         description={`当前实例：${instance.name} · Minecraft ${instance.versionId}${instance.loader ? ` · ${instance.loader}` : ""}`}
       />
 
       <div className="glass-panel rounded-[30px] p-5">
-        <div className="mb-4 flex rounded-xl border border-white/8 bg-slate-950/40 p-1">
-          <button
-            type="button"
-            onClick={() => setSource("modrinth")}
-            className={[
-              "rounded-lg px-3 py-2 text-xs transition",
-              source === "modrinth" ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500 hover:text-slate-200",
-            ].join(" ")}
-          >
-            热门 Modrinth
-          </button>
-          <button
-            type="button"
-            onClick={() => setSource("mcbbs")}
-            className={[
-              "rounded-lg px-3 py-2 text-xs transition",
-              source === "mcbbs" ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500 hover:text-slate-200",
-            ].join(" ")}
-          >
-            MCBBS 资源帖
-          </button>
-        </div>
-
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-64 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
@@ -177,74 +179,43 @@ export function CommunityMods() {
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") void search();
+                if (event.key === "Enter") void search(true);
               }}
-              placeholder="搜索 Modrinth 模组，例如 sodium、iris"
+              placeholder="搜索用于缩小范围，例如 sodium、worldgen、魔法"
               className="w-full rounded-xl border border-white/10 bg-slate-950/55 py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
             />
           </div>
           <button
             type="button"
             disabled={loading}
-            onClick={() => void (source === "modrinth" ? search() : searchMcbbs())}
+            onClick={() => void search(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
           >
             <Search size={16} />
-            {loading || mcbbsLoading ? "加载中..." : "搜索 / 刷新"}
+            {loading ? "加载中..." : "搜索"}
           </button>
         </div>
         <p className="mt-3 text-xs text-slate-600">
-          {source === "modrinth"
-            ? `默认陈列与 Minecraft ${instance.versionId}${instance.loader ? ` 和 ${instance.loader}` : ""} 兼容的热门模组；搜索只用于缩小范围。`
-            : "陈列 MCBBS 纪念版 Mod 版块的资源帖子；打开帖子后在论坛内查看下载说明。"}
+          默认陈列 20 个与当前实例兼容的热门模组；搜索只用于缩小范围，翻页时继续加载下一批。
         </p>
         {message ? <p className="mt-3 text-xs leading-5 text-cyan-200">{message}</p> : null}
       </div>
 
-      {source === "mcbbs" ? (
-        <section className="glass-panel mt-5 rounded-[28px] p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-            <Box size={16} />
-            MCBBS 资源帖
-            <StatusPill tone="slate">{`${mcbbsThreads.length} 条`}</StatusPill>
-          </div>
-          <div className="mt-4 grid max-h-[62vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
-            {mcbbsLoading ? (
-              <div className="col-span-full py-10 text-center text-sm text-slate-500">正在读取 MCBBS 版块...</div>
-            ) : mcbbsThreads.length === 0 ? (
-              <div className="col-span-full rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">
-                暂无可显示的 MCBBS 资源帖。
-              </div>
-            ) : (
-              mcbbsThreads.map((thread) => (
-                <a
-                  key={thread.url}
-                  href={thread.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-2xl border border-white/8 bg-slate-950/30 p-4 transition hover:-translate-y-0.5 hover:border-cyan-300/20 hover:bg-cyan-300/[0.035]"
-                >
-                  <div className="line-clamp-2 text-sm font-medium leading-6 text-slate-100">{thread.title}</div>
-                  <div className="mt-3 inline-flex items-center gap-1 text-xs text-cyan-300">
-                    打开 MCBBS 帖子 <ExternalLink size={12} />
-                  </div>
-                </a>
-              ))
-            )}
-          </div>
-        </section>
-      ) : (
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
         <section className="glass-panel rounded-[28px] p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
             <Box size={16} />
-            搜索结果
+            热门 / 搜索结果
             <StatusPill tone="slate">{`${results.length} 个`}</StatusPill>
           </div>
           <div className="mt-4 max-h-[56vh] space-y-3 overflow-y-auto pr-1">
-            {results.length === 0 ? (
+            {loading && results.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">
-                输入关键词后搜索社区模组。
+                正在加载 Modrinth 热门模组...
+              </div>
+            ) : results.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">
+                没有找到兼容模组。
               </div>
             ) : (
               results.map((project) => (
@@ -272,14 +243,30 @@ export function CommunityMods() {
                       <span className="shrink-0 text-[10px] text-slate-600">by {project.author}</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{project.description}</p>
-                    <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-600">
-                      <span><Download size={11} className="mr-1 inline" />{compactNumber(project.downloads)}</span>
-                      <span>{project.categories.slice(0, 3).join(" · ")}</span>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-slate-500">
+                        {compactNumber(project.downloads)} 下载
+                      </span>
+                      {project.categories.slice(0, 4).map((tag) => (
+                        <span key={tag} className="rounded-full bg-cyan-300/8 px-2 py-1 text-[10px] text-cyan-300/80">
+                          {tagLabel(tag)}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </button>
               ))
             )}
+            {canLoadMore ? (
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={() => void search(false)}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs text-slate-400 transition hover:bg-white/8 hover:text-slate-200 disabled:opacity-40"
+              >
+                {loadingMore ? "正在加载..." : "加载下 20 个"}
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -301,10 +288,21 @@ export function CommunityMods() {
           ) : (
             <div className="mt-4 max-h-[56vh] space-y-3 overflow-y-auto pr-1">
               {versions.map((version) => (
-                <div key={version.id} className="rounded-2xl border border-white/8 bg-slate-950/30 p-3">
+                <div
+                  key={version.id}
+                  className={[
+                    "rounded-2xl border p-3",
+                    recommended?.id === version.id
+                      ? "border-emerald-300/25 bg-emerald-300/[0.05]"
+                      : "border-white/8 bg-slate-950/30",
+                  ].join(" ")}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-slate-100">{version.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-slate-100">{version.name}</span>
+                        {recommended?.id === version.id ? <StatusPill tone="emerald">推荐</StatusPill> : null}
+                      </div>
                       <div className="mt-1 text-xs text-slate-600">
                         {version.versionNumber} · {formatDate(version.datePublished)} · {compactNumber(version.downloads)} 下载
                       </div>
@@ -332,7 +330,7 @@ export function CommunityMods() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300"
                     >
-                      查看项目 <ExternalLink size={12} />
+                      访问 Modrinth 官方页 <ExternalLink size={12} />
                     </a>
                     <button
                       type="button"
@@ -350,7 +348,6 @@ export function CommunityMods() {
           )}
         </section>
       </div>
-      )}
     </div>
   );
 }

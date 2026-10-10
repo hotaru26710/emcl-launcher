@@ -124,10 +124,11 @@ export interface InstallLoaderInput {
   jobId?: string | null;
 }
 
-export interface McbbsThread {
-  title: string;
-  url: string;
-  author?: string | null;
+export interface CommunityInstallResult {
+  installed: number;
+  skipped: number;
+  dependencies: string[];
+  mods: ModInfo[];
 }
 
 export interface ModrinthSearchResult {
@@ -166,6 +167,7 @@ export interface ModrinthVersionInfo {
   loaders: string[];
   datePublished: string;
   downloads: number;
+  recommended: boolean;
   files: ModrinthFile[];
 }
 

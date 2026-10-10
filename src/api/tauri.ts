@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AccountSummary,
+  CommunityInstallResult,
   CreateInstanceInput,
   DeviceCodeResponse,
   InstallLoaderInput,
@@ -10,7 +11,6 @@ import type {
   InstallVersionInput,
   LoaderInstallResult,
   LoaderVersionInfo,
-  McbbsThread,
   ModInfo,
   InstallModrinthInput,
   ModrinthSearchResult,
@@ -82,9 +82,7 @@ export const api = {
   getModrinthVersions: (projectId: string, gameVersion: string, loader?: string | null) =>
     invoke<ModrinthVersionInfo[]>("get_modrinth_versions", { projectId, gameVersion, loader }),
   installModrinthVersion: (input: InstallModrinthInput) =>
-    invoke<ModInfo[]>("install_modrinth_version", { input }),
-  listMcbbsMods: (query?: string) =>
-    invoke<McbbsThread[]>("list_mcbbs_mods", { query }),
+    invoke<CommunityInstallResult>("install_modrinth_version", { input }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),

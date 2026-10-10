@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -29,12 +28,13 @@ pub struct ModrinthSearchResult {
     pub versions: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct McbbsThread {
-    pub title: String,
-    pub url: String,
-    pub author: Option<String>,
+pub struct CommunityInstallResult {
+    pub installed: usize,
+    pub skipped: usize,
+    pub dependencies: Vec<String>,
+    pub mods: Vec<ModInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +49,7 @@ pub struct ModrinthVersionInfo {
     pub loaders: Vec<String>,
     pub date_published: String,
     pub downloads: u64,
+    pub recommended: bool,
     pub files: Vec<ModrinthFile>,
 }
 
@@ -66,53 +67,6 @@ pub struct ModrinthFile {
 pub struct ModrinthHashes {
     pub sha1: Option<String>,
     pub sha512: Option<String>,
-}
-
-pub async fn list_mcbbs_mods(client: &Client, query: &str) -> Result<Vec<McbbsThread>> {
-    let html = api_get_text(
-        client,
-        "https://www.mcbbs.co/forum.php?mod=forumdisplay&fid=39&mobile=2",
-    )
-    .await?;
-    let link_regex = Regex::new(r#"<a[^>]*href="(thread-\d+-1-1\.html)"[^>]*>(.*?)</a>"#)?;
-    let tag_regex = Regex::new(r"<[^>]+>")?;
-    let mut seen = HashSet::new();
-    let query = query.trim().to_lowercase();
-    let mut results = Vec::new();
-
-    for captures in link_regex.captures_iter(&html) {
-        let href = captures
-            .get(1)
-            .map(|value| value.as_str())
-            .unwrap_or_default();
-        if !seen.insert(href.to_string()) {
-            continue;
-        }
-        let raw_title = captures
-            .get(2)
-            .map(|value| value.as_str())
-            .unwrap_or_default();
-        let title = html_unescape(&tag_regex.replace_all(raw_title, " "))
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ");
-        if title.is_empty()
-            || title.chars().all(|character| character.is_ascii_digit())
-            || (!query.is_empty() && !title.to_lowercase().contains(&query))
-        {
-            continue;
-        }
-        results.push(McbbsThread {
-            title,
-            url: format!("https://www.mcbbs.co/{href}"),
-            author: None,
-        });
-        if results.len() >= 60 {
-            break;
-        }
-    }
-
-    Ok(results)
 }
 
 #[derive(Debug, Deserialize)]
@@ -221,7 +175,26 @@ pub async fn get_modrinth_versions(
     )
     .await?;
 
-    Ok(versions.into_iter().map(version_info).collect())
+    let mut versions = versions.into_iter().collect::<Vec<_>>();
+    versions.sort_by_key(|version| std::cmp::Reverse(version_score(version)));
+    Ok(versions
+        .into_iter()
+        .enumerate()
+        .map(|(index, version)| version_info(version, index == 0))
+        .collect())
+}
+
+fn version_score(version: &ModrinthVersion) -> (u8, u64, String) {
+    (
+        match version.version_type.as_str() {
+            "release" => 3,
+            "beta" => 2,
+            "alpha" => 1,
+            _ => 0,
+        },
+        version.downloads,
+        version.date_published.clone(),
+    )
 }
 
 pub async fn install_modrinth_version(
@@ -230,9 +203,9 @@ pub async fn install_modrinth_version(
     instance: &Instance,
     version_id: &str,
     reporter: &ProgressReporter,
-) -> Result<Vec<ModInfo>> {
+) -> Result<CommunityInstallResult> {
     let mut visited = HashSet::new();
-    install_version_recursive(
+    let mut result = install_version_recursive(
         client,
         paths,
         instance,
@@ -242,7 +215,8 @@ pub async fn install_modrinth_version(
         &mut visited,
     )
     .await?;
-    mods::list_mods(paths, instance)
+    result.mods = mods::list_mods(paths, instance)?;
+    Ok(result)
 }
 
 async fn install_version_recursive(
@@ -253,12 +227,12 @@ async fn install_version_recursive(
     reporter: &ProgressReporter,
     depth: usize,
     visited: &mut HashSet<String>,
-) -> Result<()> {
+) -> Result<CommunityInstallResult> {
     if depth > 8 {
         bail!("Modrinth 依赖层级过深");
     }
     if !visited.insert(version_id.to_string()) {
-        return Ok(());
+        return Ok(CommunityInstallResult::default());
     }
 
     let version: ModrinthVersion =
@@ -269,7 +243,14 @@ async fn install_version_recursive(
         .find(|file| file.primary)
         .or_else(|| version.files.first())
         .context("Modrinth 版本没有可下载文件")?;
-    install_mod_file(client, paths, instance, file, reporter).await?;
+    let mut result = CommunityInstallResult::default();
+    let skipped = install_mod_file(client, paths, instance, file, reporter).await?;
+    if skipped {
+        result.skipped += 1;
+    } else {
+        result.installed += 1;
+    }
+    result.dependencies.push(file.filename.clone());
 
     for dependency in version
         .dependencies
@@ -277,7 +258,7 @@ async fn install_version_recursive(
         .filter(|dependency| dependency.dependency_type == "required")
     {
         if let Some(version_id) = dependency.version_id.as_deref() {
-            Box::pin(install_version_recursive(
+            let child = Box::pin(install_version_recursive(
                 client,
                 paths,
                 instance,
@@ -287,6 +268,7 @@ async fn install_version_recursive(
                 visited,
             ))
             .await?;
+            merge_install_result(&mut result, child);
         } else if let Some(project_id) = dependency.project_id.as_deref() {
             let versions = get_modrinth_versions(
                 client,
@@ -296,7 +278,7 @@ async fn install_version_recursive(
             )
             .await?;
             if let Some(version) = versions.first() {
-                Box::pin(install_version_recursive(
+                let child = Box::pin(install_version_recursive(
                     client,
                     paths,
                     instance,
@@ -306,11 +288,18 @@ async fn install_version_recursive(
                     visited,
                 ))
                 .await?;
+                merge_install_result(&mut result, child);
             }
         }
     }
 
-    Ok(())
+    Ok(result)
+}
+
+fn merge_install_result(target: &mut CommunityInstallResult, incoming: CommunityInstallResult) {
+    target.installed += incoming.installed;
+    target.skipped += incoming.skipped;
+    target.dependencies.extend(incoming.dependencies);
 }
 
 async fn install_mod_file(
@@ -319,7 +308,7 @@ async fn install_mod_file(
     instance: &Instance,
     file: &ModrinthFile,
     reporter: &ProgressReporter,
-) -> Result<()> {
+) -> Result<bool> {
     if !file.filename.to_ascii_lowercase().ends_with(".jar") {
         bail!("社区模组文件不是 .jar: {}", file.filename);
     }
@@ -327,6 +316,11 @@ async fn install_mod_file(
         &PathBuf::from(&instance.directory).join("mods"),
         &file.filename,
     )?;
+    if install::artifact_file_is_valid(&destination, file.hashes.sha1.as_deref(), Some(file.size))
+        .await?
+    {
+        return Ok(true);
+    }
     install::download_artifacts(ArtifactDownloadRequest {
         client,
         mirror: "official",
@@ -344,41 +338,11 @@ async fn install_mod_file(
         }],
         reporter,
     })
-    .await
+    .await?;
+    Ok(false)
 }
 
-async fn api_get_text(client: &Client, url: &str) -> Result<String> {
-    let response = client
-        .get(url)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
-        )
-        .send()
-        .await
-        .with_context(|| format!("请求失败: {url}"))?;
-    let status = response.status();
-    let text = response.text().await?;
-    if !status.is_success() {
-        bail!(
-            "请求返回 {status}: {}",
-            text.chars().take(300).collect::<String>()
-        );
-    }
-    Ok(text)
-}
-
-fn html_unescape(value: &str) -> String {
-    value
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&nbsp;", " ")
-}
-
-fn version_info(version: ModrinthVersion) -> ModrinthVersionInfo {
+fn version_info(version: ModrinthVersion, recommended: bool) -> ModrinthVersionInfo {
     ModrinthVersionInfo {
         id: version.id,
         project_id: version.project_id,
@@ -389,6 +353,7 @@ fn version_info(version: ModrinthVersion) -> ModrinthVersionInfo {
         loaders: version.loaders,
         date_published: version.date_published,
         downloads: version.downloads,
+        recommended,
         files: version
             .files
             .into_iter()
@@ -452,18 +417,6 @@ fn safe_mod_path(directory: &Path, file_name: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    #[ignore = "requires network access"]
-    async fn lists_mcbbs_mod_threads() {
-        let client = Client::builder()
-            .user_agent("EMCL-Community-test/0.1.0")
-            .build()
-            .unwrap();
-        let threads = list_mcbbs_mods(&client, "").await.unwrap();
-        assert!(!threads.is_empty());
-        assert!(threads[0].url.starts_with("https://www.mcbbs.co/thread-"));
-    }
 
     #[tokio::test]
     #[ignore = "requires network access"]
