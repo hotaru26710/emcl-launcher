@@ -60,6 +60,10 @@ pub fn run() {
             commands::version::get_version_manifest,
             commands::version::get_version_details,
             commands::install::install_version,
+            commands::java::detect_java,
+            commands::java::recommend_java,
+            commands::settings::get_default_java,
+            commands::settings::set_default_java,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

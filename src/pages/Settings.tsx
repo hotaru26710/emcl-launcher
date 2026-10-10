@@ -4,8 +4,10 @@ import {
   CloudDownload,
   Database,
   FolderOpen,
+  Cpu,
   Gauge,
   Globe2,
+  RefreshCw,
   Save,
 } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
@@ -15,21 +17,28 @@ export function SettingsPage() {
   const settings = useLauncherStore((state) => state.settings);
   const saving = useLauncherStore((state) => state.savingSettings);
   const saveSettings = useLauncherStore((state) => state.saveSettings);
+  const detectJava = useLauncherStore((state) => state.detectJava);
+  const saveDefaultJava = useLauncherStore((state) => state.saveDefaultJava);
+  const javaInstallations = useLauncherStore((state) => state.javaInstallations);
 
   const [mirror, setMirror] = useState<"official" | "bmclapi">("official");
   const [concurrency, setConcurrency] = useState(8);
+  const [defaultJavaPath, setDefaultJavaPath] = useState<string | null>(null);
+  const [detectingJava, setDetectingJava] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
     setMirror(settings.downloadMirror === "bmclapi" ? "bmclapi" : "official");
     setConcurrency(settings.downloadConcurrency);
+    setDefaultJavaPath(settings.defaultJavaPath ?? null);
   }, [settings]);
 
   const save = async () => {
     setSaved(false);
     try {
       await saveSettings({ downloadMirror: mirror, downloadConcurrency: concurrency });
+      await saveDefaultJava(defaultJavaPath);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2000);
     } catch {
@@ -110,6 +119,57 @@ export function SettingsPage() {
           <p className="mt-3 text-xs text-slate-600">
             资源文件很多，默认 8 个并发请求；网络不稳时可调低。
           </p>
+        </section>
+
+        <section className="glass-panel hover-lift rounded-[28px] p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Cpu size={17} className="text-cyan-300" />
+              <h2 className="text-sm font-semibold text-slate-200">Java 运行时</h2>
+            </div>
+            <button
+              type="button"
+              disabled={detectingJava}
+              onClick={() => {
+                setDetectingJava(true);
+                void detectJava()
+                  .then((installations) => {
+                    if (!defaultJavaPath && installations[0]) {
+                      setDefaultJavaPath(installations[0].path);
+                    }
+                  })
+                  .catch(() => undefined)
+                  .finally(() => setDetectingJava(false));
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 transition hover:bg-white/8 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={detectingJava ? "animate-spin" : ""} />
+              扫描 Java
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            启动器会读取 JAVA_HOME、PATH 和常见 JDK 安装目录；实例没有单独指定时使用这里的默认值。
+          </p>
+          <div className="mt-4">
+            {javaInstallations.length > 0 ? (
+              <select
+                value={defaultJavaPath ?? ""}
+                onChange={(event) => setDefaultJavaPath(event.currentTarget.value || null)}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40"
+              >
+                <option value="">自动选择</option>
+                {javaInstallations.map((installation) => (
+                  <option key={installation.path} value={installation.path}>
+                    Java {installation.majorVersion ?? "?"} · {installation.vendor ?? "Unknown"} · {installation.path}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
+                点击“扫描 Java”查找本机 JDK。
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="glass-panel hover-lift rounded-[28px] p-5">

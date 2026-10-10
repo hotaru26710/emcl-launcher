@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/tauri";
-import type { Instance } from "../api/types";
+import type { Instance, JavaRecommendation } from "../api/types";
 import { InstallProgressCard } from "../components/ProgressBar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
@@ -28,6 +28,9 @@ export function InstanceDetail() {
   const startInstall = useLauncherStore((state) => state.startInstall);
   const activeInstall = useLauncherStore((state) => state.activeInstall);
   const installProgress = useLauncherStore((state) => state.installProgress);
+  const settings = useLauncherStore((state) => state.settings);
+  const detectJava = useLauncherStore((state) => state.detectJava);
+  const javaInstallations = useLauncherStore((state) => state.javaInstallations);
 
   const [instance, setInstance] = useState<Instance | null>(
     instances.find((item) => item.id === id) ?? null,
@@ -35,6 +38,9 @@ export function InstanceDetail() {
   const [loading, setLoading] = useState(!instance);
   const [memoryMb, setMemoryMb] = useState(instance?.memoryMb ?? 4096);
   const [jvmArgs, setJvmArgs] = useState(instance?.jvmArgs ?? "");
+  const [javaPath, setJavaPath] = useState(instance?.javaPath ?? "");
+  const [recommendation, setRecommendation] = useState<JavaRecommendation | null>(null);
+  const [detectingJava, setDetectingJava] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -67,7 +73,23 @@ export function InstanceDetail() {
     if (!instance) return;
     setMemoryMb(instance.memoryMb);
     setJvmArgs(instance.jvmArgs);
-  }, [instance]);
+    setJavaPath(instance.javaPath ?? settings?.defaultJavaPath ?? "");
+
+    let disposed = false;
+    void api
+      .recommendJava(instance.versionId)
+      .then((result) => {
+        if (!disposed) setRecommendation(result);
+      })
+      .catch(() => undefined);
+    if (javaInstallations.length === 0) {
+      void detectJava().catch(() => undefined);
+    }
+
+    return () => {
+      disposed = true;
+    };
+  }, [instance, settings?.defaultJavaPath]);
 
   if (!id || (!loading && !instance)) {
     return (
@@ -90,7 +112,11 @@ export function InstanceDetail() {
     if (!instance) return;
     setSaving(true);
     try {
-      const next = await updateInstance(instance.id, { memoryMb, jvmArgs });
+      const next = await updateInstance(instance.id, {
+        memoryMb,
+        jvmArgs,
+        javaPath: javaPath || null,
+      });
       setInstance(next);
     } catch {
       // The shared error banner owns the message.
@@ -163,6 +189,59 @@ export function InstanceDetail() {
         <section className="glass-panel hover-lift rounded-[28px] p-5">
           <h2 className="text-sm font-semibold text-slate-200">运行配置</h2>
           <div className="mt-5 space-y-5">
+            <label className="block">
+              <span className="flex items-center justify-between gap-3 text-xs font-medium text-slate-400">
+                <span className="flex items-center gap-2">
+                  <Cpu size={14} />
+                  Java 运行时
+                </span>
+                <button
+                  type="button"
+                  disabled={detectingJava}
+                  onClick={() => {
+                    setDetectingJava(true);
+                    void detectJava()
+                      .then((installations) => {
+                        if (!javaPath && installations[0]) {
+                          setJavaPath(installations[0].path);
+                        }
+                      })
+                      .catch(() => undefined)
+                      .finally(() => setDetectingJava(false));
+                  }}
+                  className="text-[11px] font-normal text-cyan-300 transition hover:text-cyan-200 disabled:opacity-40"
+                >
+                  {detectingJava ? "扫描中..." : "重新扫描"}
+                </button>
+              </span>
+              <select
+                value={javaPath}
+                onChange={(event) => setJavaPath(event.currentTarget.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40"
+              >
+                <option value="">自动选择推荐 Java</option>
+                {javaInstallations.map((installation) => (
+                  <option key={installation.path} value={installation.path}>
+                    Java {installation.majorVersion ?? "?"} · {installation.vendor ?? "Unknown"} · {installation.path}
+                  </option>
+                ))}
+              </select>
+              {recommendation ? (
+                <div className="mt-2 flex items-center justify-between gap-3 text-[11px] leading-5 text-slate-600">
+                  <span>{recommendation.reason}</span>
+                  {recommendation.installation ? (
+                    <button
+                      type="button"
+                      onClick={() => setJavaPath(recommendation.installation!.path)}
+                      className="shrink-0 text-cyan-400 hover:text-cyan-200"
+                    >
+                      使用推荐
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </label>
+
             <label className="block">
               <span className="flex items-center gap-2 text-xs font-medium text-slate-400">
                 <MemoryStick size={14} />

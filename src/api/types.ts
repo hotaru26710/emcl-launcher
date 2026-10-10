@@ -93,8 +93,25 @@ export interface UpdateInstanceInput {
 export interface Settings {
   downloadMirror: "official" | "bmclapi" | string;
   downloadConcurrency: number;
+  defaultJavaPath?: string | null;
   sharedDirectory: string;
   dataDirectory: string;
+}
+
+export interface JavaInstallation {
+  path: string;
+  javaHome?: string | null;
+  version?: string | null;
+  majorVersion?: number | null;
+  vendor?: string | null;
+  architecture?: string | null;
+  is64Bit: boolean;
+}
+
+export interface JavaRecommendation {
+  requiredMajor?: number | null;
+  installation?: JavaInstallation | null;
+  reason: string;
 }
 
 export interface UpdateSettingsInput {

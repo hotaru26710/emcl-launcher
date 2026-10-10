@@ -4,6 +4,7 @@ import type {
   CreateInstanceInput,
   InstallProgress,
   Instance,
+  JavaInstallation,
   Settings,
   UpdateInstanceInput,
   UpdateSettingsInput,
@@ -35,6 +36,9 @@ interface LauncherStore {
   updateInstance: (id: string, input: UpdateInstanceInput) => Promise<Instance>;
   deleteInstance: (id: string) => Promise<void>;
   saveSettings: (input: UpdateSettingsInput) => Promise<Settings>;
+  saveDefaultJava: (javaPath: string | null) => Promise<void>;
+  javaInstallations: JavaInstallation[];
+  detectJava: () => Promise<JavaInstallation[]>;
   startInstall: (versionId: string, instanceId?: string | null) => Promise<void>;
   setInstallProgress: (progress: InstallProgress) => void;
   clearActiveInstall: () => void;
@@ -55,6 +59,7 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
   instances: [],
   manifest: null,
   settings: null,
+  javaInstallations: [],
   loadingInstances: false,
   loadingManifest: false,
   savingSettings: false,
@@ -161,6 +166,28 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
     }
   },
 
+  saveDefaultJava: async (javaPath) => {
+    try {
+      await api.setDefaultJava(javaPath);
+      const settings = await api.getSettings();
+      set({ settings, lastError: null });
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
+  detectJava: async () => {
+    try {
+      const javaInstallations = await api.detectJava();
+      set({ javaInstallations, lastError: null });
+      return javaInstallations;
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
   startInstall: async (versionId, instanceId = null) => {
     const jobId = crypto.randomUUID();
     set((state) => ({
@@ -209,8 +236,6 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
         },
       }));
       throw error;
-    } finally {
-      await get().refreshInstances().catch(() => undefined);
     }
   },
 

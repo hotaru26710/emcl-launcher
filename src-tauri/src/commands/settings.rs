@@ -14,6 +14,32 @@ pub(crate) fn load_settings(state: &AppState) -> Result<Settings, String> {
 }
 
 #[tauri::command]
+pub fn get_default_java(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    get_setting(&connection, "default_java_path").map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn set_default_java(
+    state: State<'_, AppState>,
+    java_path: Option<String>,
+) -> Result<(), String> {
+    let connection = state.db.lock().map_err(|error| error.to_string())?;
+    if let Some(path) = java_path {
+        if path.trim().is_empty() {
+            return Err("java path cannot be empty".to_string());
+        }
+        set_setting(&connection, "default_java_path", path.trim())
+            .map_err(|error| error.to_string())?;
+    } else {
+        connection
+            .execute("DELETE FROM settings WHERE key = 'default_java_path'", [])
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
     load_settings(&state)
 }
@@ -53,10 +79,12 @@ fn settings_from_connection(state: &AppState, connection: &Connection) -> anyhow
         .parse::<u32>()
         .context("invalid download concurrency setting")?
         .clamp(1, 16);
+    let default_java_path = get_setting(connection, "default_java_path")?;
 
     Ok(Settings {
         download_mirror: mirror,
         download_concurrency: concurrency,
+        default_java_path,
         shared_directory: state.paths.shared_dir().to_string_lossy().into_owned(),
         data_directory: state.paths.root().to_string_lossy().into_owned(),
     })

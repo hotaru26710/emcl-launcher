@@ -46,6 +46,7 @@ pub struct UpdateInstanceInput {
 pub struct Settings {
     pub download_mirror: String,
     pub download_concurrency: u32,
+    pub default_java_path: Option<String>,
     pub shared_directory: String,
     pub data_directory: String,
 }

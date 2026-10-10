@@ -6,6 +6,8 @@ import type {
   InstallSummary,
   InstallVersionInput,
   Instance,
+  JavaInstallation,
+  JavaRecommendation,
   LauncherInfo,
   Settings,
   UpdateInstanceInput,
@@ -30,6 +32,12 @@ export const api = {
     invoke<VersionManifest>("get_version_manifest", { forceRefresh }),
   getVersionDetails: (versionId: string) =>
     invoke<VersionDetails>("get_version_details", { versionId }),
+  detectJava: () => invoke<JavaInstallation[]>("detect_java"),
+  recommendJava: (versionId: string) =>
+    invoke<JavaRecommendation>("recommend_java", { versionId }),
+  getDefaultJava: () => invoke<string | null>("get_default_java"),
+  setDefaultJava: (javaPath: string | null) =>
+    invoke<void>("set_default_java", { javaPath }),
   installVersion: (input: InstallVersionInput) =>
     invoke<InstallSummary>("install_version", { input }),
   onInstallProgress: (callback: (progress: InstallProgress) => void): Promise<UnlistenFn> =>
