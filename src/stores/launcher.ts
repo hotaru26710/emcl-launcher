@@ -6,6 +6,7 @@ import type {
   InstallProgress,
   Instance,
   JavaInstallation,
+  LaunchLog,
   Settings,
   UpdateInstanceInput,
   UpdateSettingsInput,
@@ -41,11 +42,17 @@ interface LauncherStore {
   javaInstallations: JavaInstallation[];
   detectJava: () => Promise<JavaInstallation[]>;
   accounts: AccountSummary[];
+  launchLogs: Record<string, LaunchLog[]>;
+  runningInstances: Record<string, boolean>;
   refreshAccounts: () => Promise<void>;
   createOfflineAccount: (username: string) => Promise<AccountSummary>;
   setActiveAccount: (id: string) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   startInstall: (versionId: string, instanceId?: string | null) => Promise<void>;
+  startInstance: (instanceId: string) => Promise<void>;
+  stopInstance: (instanceId: string) => Promise<void>;
+  appendLaunchLog: (log: LaunchLog) => void;
+  setInstanceRunning: (instanceId: string, running: boolean) => void;
   setInstallProgress: (progress: InstallProgress) => void;
   clearActiveInstall: () => void;
   clearError: () => void;
@@ -67,6 +74,8 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
   settings: null,
   javaInstallations: [],
   accounts: [],
+  launchLogs: {},
+  runningInstances: {},
   loadingInstances: false,
   loadingManifest: false,
   savingSettings: false,
@@ -290,17 +299,61 @@ export const useLauncherStore = create<LauncherStore>((set, get) => ({
     }
   },
 
+  startInstance: async (instanceId) => {
+    set((state) => ({
+      runningInstances: { ...state.runningInstances, [instanceId]: true },
+      launchLogs: { ...state.launchLogs, [instanceId]: [] },
+      lastError: null,
+    }));
+    try {
+      await api.launchInstance(instanceId);
+      await get().refreshInstances();
+    } catch (error) {
+      set((state) => ({
+        runningInstances: { ...state.runningInstances, [instanceId]: false },
+        lastError: errorMessage(error),
+      }));
+      throw error;
+    }
+  },
+
+  stopInstance: async (instanceId) => {
+    try {
+      await api.stopInstance(instanceId);
+      set((state) => ({
+        runningInstances: { ...state.runningInstances, [instanceId]: false },
+        lastError: null,
+      }));
+    } catch (error) {
+      set({ lastError: errorMessage(error) });
+      throw error;
+    }
+  },
+
+  appendLaunchLog: (log) => {
+    set((state) => ({
+      launchLogs: {
+        ...state.launchLogs,
+        [log.instanceId]: [...(state.launchLogs[log.instanceId] ?? []), log].slice(-1500),
+      },
+    }));
+  },
+
+  setInstanceRunning: (instanceId, running) => {
+    set((state) => ({
+      runningInstances: { ...state.runningInstances, [instanceId]: running },
+    }));
+  },
+
   setInstallProgress: (progress) => {
-    set((state) => {
-      return {
-        activeInstall: state.activeInstall,
-        installProgress: {
-          ...state.installProgress,
-          [progress.jobId]: progress,
-        },
-        lastError: progress.status === "error" ? progress.message : state.lastError,
-      };
-    });
+    set((state) => ({
+      activeInstall: state.activeInstall,
+      installProgress: {
+        ...state.installProgress,
+        [progress.jobId]: progress,
+      },
+      lastError: progress.status === "error" ? progress.message : state.lastError,
+    }));
   },
 
   clearActiveInstall: () => set({ activeInstall: null }),

@@ -33,28 +33,39 @@ function GlobalError() {
 function App() {
   const initialize = useLauncherStore((state) => state.initialize);
   const setInstallProgress = useLauncherStore((state) => state.setInstallProgress);
+  const appendLaunchLog = useLauncherStore((state) => state.appendLaunchLog);
+  const setInstanceRunning = useLauncherStore((state) => state.setInstanceRunning);
 
   useEffect(() => {
     void initialize();
   }, [initialize]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
     let disposed = false;
+    const unlisteners: Array<() => void> = [];
+    const register = (listener: Promise<() => void>) => {
+      void listener.then((stopListening) => {
+        if (disposed) {
+          stopListening();
+        } else {
+          unlisteners.push(stopListening);
+        }
+      });
+    };
 
-    void api.onInstallProgress(setInstallProgress).then((stopListening) => {
-      if (disposed) {
-        stopListening();
-      } else {
-        unlisten = stopListening;
-      }
-    });
+    register(api.onInstallProgress(setInstallProgress));
+    register(api.onLaunchLog(appendLaunchLog));
+    register(
+      api.onLaunchExit((exit) => {
+        setInstanceRunning(exit.instanceId, false);
+      }),
+    );
 
     return () => {
       disposed = true;
-      unlisten?.();
+      unlisteners.forEach((stopListening) => stopListening());
     };
-  }, [setInstallProgress]);
+  }, [setInstallProgress, appendLaunchLog, setInstanceRunning]);
 
   return (
     <HashRouter>

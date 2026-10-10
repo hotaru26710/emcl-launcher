@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   CloudDownload,
@@ -6,7 +6,9 @@ import {
   FolderOpen,
   HardDrive,
   MemoryStick,
+  Play,
   Save,
+  Square,
   Terminal,
   Trash2,
 } from "lucide-react";
@@ -26,8 +28,12 @@ export function InstanceDetail() {
   const updateInstance = useLauncherStore((state) => state.updateInstance);
   const deleteInstance = useLauncherStore((state) => state.deleteInstance);
   const startInstall = useLauncherStore((state) => state.startInstall);
+  const startInstance = useLauncherStore((state) => state.startInstance);
+  const stopInstance = useLauncherStore((state) => state.stopInstance);
   const activeInstall = useLauncherStore((state) => state.activeInstall);
   const installProgress = useLauncherStore((state) => state.installProgress);
+  const runningInstances = useLauncherStore((state) => state.runningInstances);
+  const launchLogs = useLauncherStore((state) => state.launchLogs);
   const settings = useLauncherStore((state) => state.settings);
   const detectJava = useLauncherStore((state) => state.detectJava);
   const javaInstallations = useLauncherStore((state) => state.javaInstallations);
@@ -42,6 +48,7 @@ export function InstanceDetail() {
   const [recommendation, setRecommendation] = useState<JavaRecommendation | null>(null);
   const [detectingJava, setDetectingJava] = useState(false);
   const [saving, setSaving] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -90,6 +97,15 @@ export function InstanceDetail() {
       disposed = true;
     };
   }, [instance, settings?.defaultJavaPath]);
+
+  const running = Boolean(instance && runningInstances[instance.id]);
+  const logs = instance ? launchLogs[instance.id] ?? [] : [];
+
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [logs.length]);
 
   if (!id || (!loading && !instance)) {
     return (
@@ -143,6 +159,22 @@ export function InstanceDetail() {
     }
   };
 
+  const launch = async () => {
+    try {
+      await startInstance(instance.id);
+    } catch {
+      // The shared error banner owns the message.
+    }
+  };
+
+  const stop = async () => {
+    try {
+      await stopInstance(instance.id);
+    } catch {
+      // The shared error banner owns the message.
+    }
+  };
+
   return (
     <div className="animate-page mx-auto max-w-5xl">
       <Link
@@ -158,14 +190,33 @@ export function InstanceDetail() {
         description={`基于 Minecraft ${instance.versionId}${instance.loader ? ` · ${instance.loader}` : " · Vanilla"}`}
         action={
           <div className="flex items-center gap-2">
+            {running ? (
+              <button
+                type="button"
+                onClick={() => void stop()}
+                className="inline-flex items-center gap-2 rounded-xl border border-rose-300/20 bg-rose-400/10 px-4 py-2.5 text-sm font-semibold text-rose-200 transition hover:bg-rose-400/15"
+              >
+                <Square size={16} />
+                停止游戏
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void launch()}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+              >
+                <Play size={17} />
+                启动游戏
+              </button>
+            )}
             <button
               type="button"
-              disabled={progress?.status === "running"}
+              disabled={progress?.status === "running" || running}
               onClick={() => void install()}
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.08] px-4 py-2.5 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-300/[0.13] disabled:opacity-40"
             >
               <CloudDownload size={17} />
-              安装游戏文件
+              安装文件
             </button>
             <button
               type="button"
@@ -306,6 +357,14 @@ export function InstanceDetail() {
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
+                <dt className="text-slate-500">运行状态</dt>
+                <dd>
+                  <StatusPill tone={running ? "emerald" : "slate"}>
+                    {running ? "运行中" : "未运行"}
+                  </StatusPill>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
                 <dt className="text-slate-500">Java</dt>
                 <dd className="truncate text-slate-300">{instance.javaPath ?? "自动检测"}</dd>
               </div>
@@ -335,8 +394,27 @@ export function InstanceDetail() {
               <Cpu size={16} />
               日志
             </div>
-            <div className="mt-3 grid min-h-24 place-items-center rounded-xl border border-dashed border-white/8 bg-slate-950/35 p-4 text-center text-xs leading-5 text-slate-600">
-              启动游戏后，实时日志会显示在这里。
+            <div
+              ref={logRef}
+              className="mt-3 h-64 overflow-y-auto rounded-2xl border border-slate-800/80 bg-[#040914] p-3 font-mono text-[11px] leading-5 text-slate-400 shadow-inner"
+            >
+              {logs.length === 0 ? (
+                <div className="grid h-full place-items-center text-center text-slate-700">
+                  启动游戏后，stdout / stderr 会实时显示在这里。
+                </div>
+              ) : (
+                logs.map((log, index) => (
+                  <div
+                    key={`${log.timestamp}-${index}`}
+                    className={log.stream === "stderr" ? "text-amber-300/80" : "text-slate-400"}
+                  >
+                    <span className="mr-2 select-none text-slate-700">
+                      {log.stream === "stderr" ? "!" : ">"}
+                    </span>
+                    {log.line}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </section>

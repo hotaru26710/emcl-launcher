@@ -158,6 +158,24 @@ export interface InstallSummary {
   totalBytes: number;
 }
 
+export interface LaunchResult {
+  instanceId: string;
+  pid: number;
+}
+
+export interface LaunchLog {
+  instanceId: string;
+  stream: "stdout" | "stderr" | string;
+  line: string;
+  timestamp: string;
+}
+
+export interface LaunchExit {
+  instanceId: string;
+  code?: number | null;
+  success: boolean;
+}
+
 export interface LauncherInfo {
   dataDirectory: string;
   sharedDirectory: string;

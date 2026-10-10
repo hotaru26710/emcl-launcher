@@ -10,6 +10,9 @@ import type {
   JavaInstallation,
   JavaRecommendation,
   LauncherInfo,
+  LaunchExit,
+  LaunchLog,
+  LaunchResult,
   Settings,
   UpdateInstanceInput,
   UpdateSettingsInput,
@@ -47,8 +50,17 @@ export const api = {
   getActiveAccount: () => invoke<AccountSummary | null>("get_active_account"),
   installVersion: (input: InstallVersionInput) =>
     invoke<InstallSummary>("install_version", { input }),
+  launchInstance: (instanceId: string) =>
+    invoke<LaunchResult>("launch_instance", { instanceId }),
+  stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),
+  isInstanceRunning: (instanceId: string) =>
+    invoke<boolean>("is_instance_running", { instanceId }),
   onInstallProgress: (callback: (progress: InstallProgress) => void): Promise<UnlistenFn> =>
     listen<InstallProgress>("install-progress", (event) => callback(event.payload)),
+  onLaunchLog: (callback: (log: LaunchLog) => void): Promise<UnlistenFn> =>
+    listen<LaunchLog>("launch-log", (event) => callback(event.payload)),
+  onLaunchExit: (callback: (exit: LaunchExit) => void): Promise<UnlistenFn> =>
+    listen<LaunchExit>("launch-exit", (event) => callback(event.payload)),
 };
 
 export function errorMessage(error: unknown): string {

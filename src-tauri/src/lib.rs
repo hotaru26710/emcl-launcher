@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::Result;
+use core::launch::ProcessRegistry;
 use core::paths::LauncherPaths;
 use db::schema;
 use reqwest::Client;
@@ -16,6 +17,7 @@ pub struct AppState {
     pub db: Mutex<Connection>,
     pub http: Client,
     pub paths: LauncherPaths,
+    pub processes: ProcessRegistry,
 }
 
 fn bootstrap(app: &mut tauri::App) -> Result<()> {
@@ -34,6 +36,7 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
         db: Mutex::new(connection),
         http,
         paths,
+        processes: ProcessRegistry::default(),
     });
 
     Ok(())
@@ -69,6 +72,9 @@ pub fn run() {
             commands::auth::delete_account,
             commands::auth::set_active_account,
             commands::auth::get_active_account,
+            commands::launch::launch_instance,
+            commands::launch::stop_instance,
+            commands::launch::is_instance_running,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

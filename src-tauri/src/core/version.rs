@@ -58,6 +58,26 @@ pub struct VersionDetails {
     pub libraries: Vec<Library>,
     pub java_version: Option<JavaVersion>,
     pub logging: Option<Logging>,
+    pub arguments: Option<Arguments>,
+    pub minecraft_arguments: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Arguments {
+    #[serde(default)]
+    pub game: Vec<Argument>,
+    #[serde(default)]
+    pub jvm: Vec<Argument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Argument {
+    Plain(String),
+    Conditional {
+        rules: Vec<Rule>,
+        value: serde_json::Value,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -331,6 +351,8 @@ mod tests {
         assert!(details.downloads.client.is_some());
         assert!(details.libraries.len() > 10);
         assert!(details.asset_index.is_some());
+        assert!(details.main_class.is_some());
+        assert!(details.arguments.is_some());
 
         let _ = std::fs::remove_dir_all(root);
     }
