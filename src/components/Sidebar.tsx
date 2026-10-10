@@ -23,7 +23,7 @@ export function Sidebar() {
             <Waves size={22} />
           </div>
           <div>
-            <div className="text-base font-semibold tracking-[0.08em] text-white">MCL</div>
+            <div className="text-base font-semibold tracking-[0.08em] text-white">EMCL</div>
             <div className="text-[9px] font-medium tracking-[0.25em] text-slate-600">
               LAUNCHER
             </div>

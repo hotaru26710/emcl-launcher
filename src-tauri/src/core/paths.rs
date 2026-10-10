@@ -10,9 +10,9 @@ pub struct LauncherPaths {
 
 impl LauncherPaths {
     pub fn discover() -> Result<Self> {
-        let root = env::var_os("MCL_HOME")
+        let root = env::var_os("EMCL_HOME")
             .map(PathBuf::from)
-            .or_else(|| dirs::home_dir().map(|home| home.join(".launcher")))
+            .or_else(|| dirs::home_dir().map(|home| home.join(".emcl")))
             .context("unable to resolve the user home directory")?;
 
         Ok(Self { root })

@@ -1,4 +1,4 @@
-# MCL Launcher
+# EMCL — Ember Minecraft Launcher
 
 用 Tauri 2 + React + TypeScript 编写的本地 Minecraft 启动器初版。当前完成第 1～3 步：
 
@@ -17,10 +17,10 @@
 
 ## 本地目录
 
-默认数据目录为 `~/.launcher`，也可以通过 `MCL_HOME` 环境变量覆盖。
+默认数据目录为 `~/.emcl`，也可以通过 `EMCL_HOME` 环境变量覆盖。
 
 ```text
-~/.launcher/
+~/.emcl/
 ├─ launcher.db
 ├─ instances/<instance-id>/
 │  ├─ mods/
@@ -35,7 +35,7 @@
    │  ├─ version.json
    │  ├─ client.jar
    │  ├─ natives/
-   │  └─ .mcl-installed.json
+   │  └─ .emcl-installed.json
    ├─ libraries/
    ├─ assets/
    │  ├─ indexes/

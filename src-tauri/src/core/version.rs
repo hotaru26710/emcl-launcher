@@ -33,7 +33,7 @@ pub struct LatestVersions {
 #[serde(rename_all = "camelCase")]
 pub struct VersionSummary {
     pub id: String,
-    #[serde(rename = "type")]
+    #[serde(rename(deserialize = "type", serialize = "versionType"))]
     pub version_type: String,
     pub url: String,
     pub time: String,
@@ -46,7 +46,7 @@ pub struct VersionSummary {
 #[serde(rename_all = "camelCase")]
 pub struct VersionDetails {
     pub id: String,
-    #[serde(rename = "type")]
+    #[serde(rename(deserialize = "type", serialize = "versionType"))]
     pub version_type: String,
     pub time: String,
     pub release_time: String,
@@ -295,14 +295,31 @@ pub async fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn exposes_mojang_type_as_version_type() {
+        let version: VersionSummary = serde_json::from_value(serde_json::json!({
+            "id": "1.21.1",
+            "type": "release",
+            "url": "https://example.invalid/1.21.1.json",
+            "time": "2024-08-08T14:05:17+00:00",
+            "releaseTime": "2024-08-08T14:05:17+00:00",
+            "sha1": "abc",
+            "complianceLevel": 1
+        }))
+        .unwrap();
+        let serialized = serde_json::to_value(version).unwrap();
+        assert_eq!(serialized["versionType"], "release");
+        assert!(serialized.get("type").is_none());
+    }
+
     #[tokio::test]
     #[ignore = "requires network access"]
     async fn parses_1_21_1_metadata() {
         let client = Client::builder()
-            .user_agent("MCL-Launcher-test/0.1.0")
+            .user_agent("EMCL-Launcher-test/0.1.0")
             .build()
             .expect("build HTTP client");
-        let root = std::env::temp_dir().join(format!("mcl-version-test-{}", uuid::Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("emcl-version-test-{}", uuid::Uuid::new_v4()));
         let paths = LauncherPaths::from_root(root.clone());
         paths.ensure().expect("create temporary launcher paths");
 

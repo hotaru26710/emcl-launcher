@@ -24,7 +24,7 @@ fn bootstrap(app: &mut tauri::App) -> Result<()> {
 
     let connection = schema::open_database(&paths.database_file())?;
     let http = Client::builder()
-        .user_agent("MCL-Launcher/0.1.0")
+        .user_agent("EMCL-Launcher/0.1.0")
         .connect_timeout(Duration::from_secs(20))
         .timeout(Duration::from_secs(300))
         .pool_max_idle_per_host(32)
@@ -62,5 +62,5 @@ pub fn run() {
             commands::install::install_version,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running MCL Launcher");
+        .expect("error while running EMCL");
 }

@@ -414,7 +414,7 @@ pub async fn install_version(
         library_count,
         asset_count,
     };
-    let status_path = version_dir.join(".mcl-installed.json");
+    let status_path = version_dir.join(".emcl-installed.json");
     let marker_bytes = serde_json::to_vec_pretty(&marker)?;
     crate::core::version::write_bytes_atomic(&status_path, &marker_bytes).await?;
 
@@ -935,7 +935,8 @@ mod tests {
             stream.write_all(&expected[6..]).unwrap();
         });
 
-        let root = std::env::temp_dir().join(format!("mcl-download-test-{}", uuid::Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("emcl-download-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).await.unwrap();
         let destination = root.join("asset.bin");
         let part = part_path(&destination);
@@ -968,7 +969,7 @@ mod tests {
     #[ignore = "requires network access"]
     async fn downloads_real_asset_with_checksum() {
         let root =
-            std::env::temp_dir().join(format!("mcl-real-asset-test-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("emcl-real-asset-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).await.unwrap();
         let destination = root.join("asset.bin");
         let item = DownloadItem {
@@ -986,7 +987,7 @@ mod tests {
             Arc::new(|_: InstallProgress| {}),
         );
         let client = Client::builder()
-            .user_agent("MCL-Launcher-test/0.1.0")
+            .user_agent("EMCL-Launcher-test/0.1.0")
             .build()
             .unwrap();
 
