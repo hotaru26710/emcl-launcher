@@ -200,7 +200,7 @@ pub async fn get_modrinth_versions(
         .collect())
 }
 
-fn version_score(version: &ModrinthVersion) -> (u8, u64, String) {
+fn version_score(version: &ModrinthVersion) -> (u8, String, u64) {
     (
         match version.version_type.as_str() {
             "release" => 3,
@@ -208,8 +208,8 @@ fn version_score(version: &ModrinthVersion) -> (u8, u64, String) {
             "alpha" => 1,
             _ => 0,
         },
-        version.downloads,
         version.date_published.clone(),
+        version.downloads,
     )
 }
 
