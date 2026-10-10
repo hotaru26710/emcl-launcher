@@ -105,6 +105,11 @@ export interface Settings {
 
 export type LoaderType = "fabric" | "quilt" | "neoforge" | "forge";
 
+export interface LoaderVersionInfo {
+  version: string;
+  stable: boolean;
+}
+
 export interface LoaderInstallResult {
   versionId: string;
   loader: LoaderType;
@@ -117,6 +122,12 @@ export interface InstallLoaderInput {
   loader: LoaderType;
   loaderVersion?: string | null;
   jobId?: string | null;
+}
+
+export interface McbbsThread {
+  title: string;
+  url: string;
+  author?: string | null;
 }
 
 export interface ModrinthSearchResult {

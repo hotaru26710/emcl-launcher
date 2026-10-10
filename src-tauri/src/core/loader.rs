@@ -38,6 +38,13 @@ impl LoaderType {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LoaderVersionInfo {
+    pub version: String,
+    pub stable: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LoaderInstallResult {
     pub version_id: String,
     pub loader: String,
@@ -55,6 +62,109 @@ pub struct LoaderInstallRequest<'a> {
     pub mirror: &'a str,
     pub concurrency: u32,
     pub reporter: &'a ProgressReporter,
+}
+
+pub async fn list_loader_versions(
+    client: &Client,
+    loader: &LoaderType,
+    game_version: &str,
+) -> Result<Vec<LoaderVersionInfo>> {
+    match loader {
+        LoaderType::Fabric => {
+            let value = get_json(
+                client,
+                &format!("https://meta.fabricmc.net/v2/versions/loader/{game_version}"),
+            )
+            .await?;
+            Ok(loader_array_versions(&value, "loader"))
+        }
+        LoaderType::Quilt => {
+            let value = get_json(
+                client,
+                &format!("https://meta.quiltmc.org/v3/versions/loader/{game_version}"),
+            )
+            .await?;
+            Ok(loader_array_versions(&value, "loader"))
+        }
+        LoaderType::Neoforge => {
+            let xml = get_text_with_fallback(
+                client,
+                &[
+                    "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
+                    "https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/maven-metadata.xml",
+                ],
+            )
+            .await?;
+            let prefix = game_version
+                .strip_prefix("1.")
+                .unwrap_or(game_version)
+                .to_string();
+            let mut versions = xml_versions(&xml)?
+                .into_iter()
+                .filter(|version| version.starts_with(&format!("{prefix}.")))
+                .map(|version| LoaderVersionInfo {
+                    version,
+                    stable: false,
+                })
+                .collect::<Vec<_>>();
+            versions.sort_by(|left, right| version_cmp(&right.version, &left.version));
+            Ok(versions)
+        }
+        LoaderType::Forge => {
+            let xml = get_text_with_fallback(
+                client,
+                &[
+                    "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
+                    "https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/maven-metadata.xml",
+                ],
+            )
+            .await?;
+            let prefix = format!("{game_version}-");
+            let mut versions = xml_versions(&xml)?
+                .into_iter()
+                .filter_map(|version| {
+                    version.strip_prefix(&prefix)?;
+                    Some(LoaderVersionInfo {
+                        version,
+                        stable: false,
+                    })
+                })
+                .collect::<Vec<_>>();
+            versions.sort_by(|left, right| {
+                version_cmp(
+                    left.version.strip_prefix(&prefix).unwrap_or(&left.version),
+                    right
+                        .version
+                        .strip_prefix(&prefix)
+                        .unwrap_or(&right.version),
+                )
+                .reverse()
+            });
+            Ok(versions)
+        }
+    }
+}
+
+fn loader_array_versions(value: &Value, field: &str) -> Vec<LoaderVersionInfo> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let loader = item.get(field).unwrap_or(item);
+                    let version = loader.get("version").and_then(Value::as_str)?;
+                    Some(LoaderVersionInfo {
+                        version: version.to_string(),
+                        stable: loader
+                            .get("stable")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub async fn install_loader(request: LoaderInstallRequest<'_>) -> Result<LoaderInstallResult> {
@@ -854,6 +964,24 @@ mod tests {
             maven_path("net.fabricmc:fabric-loader:0.16.10"),
             "net/fabricmc/fabric-loader/0.16.10/fabric-loader-0.16.10.jar"
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires network access"]
+    async fn lists_loader_versions_from_metadata() {
+        let client = Client::builder()
+            .user_agent("EMCL-Loader-test/0.1.0")
+            .connect_timeout(std::time::Duration::from_secs(8))
+            .build()
+            .unwrap();
+        let fabric = list_loader_versions(&client, &LoaderType::Fabric, "1.21.1")
+            .await
+            .unwrap();
+        assert!(!fabric.is_empty());
+        let forge = list_loader_versions(&client, &LoaderType::Forge, "1.21.1")
+            .await
+            .unwrap();
+        assert!(!forge.is_empty());
     }
 
     #[tokio::test]

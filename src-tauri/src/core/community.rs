@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
+use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -26,6 +27,14 @@ pub struct ModrinthSearchResult {
     pub author: String,
     pub categories: Vec<String>,
     pub versions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McbbsThread {
+    pub title: String,
+    pub url: String,
+    pub author: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +66,53 @@ pub struct ModrinthFile {
 pub struct ModrinthHashes {
     pub sha1: Option<String>,
     pub sha512: Option<String>,
+}
+
+pub async fn list_mcbbs_mods(client: &Client, query: &str) -> Result<Vec<McbbsThread>> {
+    let html = api_get_text(
+        client,
+        "https://www.mcbbs.co/forum.php?mod=forumdisplay&fid=39&mobile=2",
+    )
+    .await?;
+    let link_regex = Regex::new(r#"<a[^>]*href="(thread-\d+-1-1\.html)"[^>]*>(.*?)</a>"#)?;
+    let tag_regex = Regex::new(r"<[^>]+>")?;
+    let mut seen = HashSet::new();
+    let query = query.trim().to_lowercase();
+    let mut results = Vec::new();
+
+    for captures in link_regex.captures_iter(&html) {
+        let href = captures
+            .get(1)
+            .map(|value| value.as_str())
+            .unwrap_or_default();
+        if !seen.insert(href.to_string()) {
+            continue;
+        }
+        let raw_title = captures
+            .get(2)
+            .map(|value| value.as_str())
+            .unwrap_or_default();
+        let title = html_unescape(&tag_regex.replace_all(raw_title, " "))
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if title.is_empty()
+            || title.chars().all(|character| character.is_ascii_digit())
+            || (!query.is_empty() && !title.to_lowercase().contains(&query))
+        {
+            continue;
+        }
+        results.push(McbbsThread {
+            title,
+            url: format!("https://www.mcbbs.co/{href}"),
+            author: None,
+        });
+        if results.len() >= 60 {
+            break;
+        }
+    }
+
+    Ok(results)
 }
 
 #[derive(Debug, Deserialize)]
@@ -291,6 +347,37 @@ async fn install_mod_file(
     .await
 }
 
+async fn api_get_text(client: &Client, url: &str) -> Result<String> {
+    let response = client
+        .get(url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+        )
+        .send()
+        .await
+        .with_context(|| format!("请求失败: {url}"))?;
+    let status = response.status();
+    let text = response.text().await?;
+    if !status.is_success() {
+        bail!(
+            "请求返回 {status}: {}",
+            text.chars().take(300).collect::<String>()
+        );
+    }
+    Ok(text)
+}
+
+fn html_unescape(value: &str) -> String {
+    value
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+}
+
 fn version_info(version: ModrinthVersion) -> ModrinthVersionInfo {
     ModrinthVersionInfo {
         id: version.id,
@@ -324,7 +411,10 @@ async fn api_get<T: for<'de> Deserialize<'de>>(
     let response = client
         .get(url)
         .query(query)
-        .header("User-Agent", "EMCL/0.1.0")
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+        )
         .send()
         .await
         .with_context(|| format!("Modrinth 请求失败: {url}"))?;
@@ -362,6 +452,18 @@ fn safe_mod_path(directory: &Path, file_name: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    #[ignore = "requires network access"]
+    async fn lists_mcbbs_mod_threads() {
+        let client = Client::builder()
+            .user_agent("EMCL-Community-test/0.1.0")
+            .build()
+            .unwrap();
+        let threads = list_mcbbs_mods(&client, "").await.unwrap();
+        assert!(!threads.is_empty());
+        assert!(threads[0].url.starts_with("https://www.mcbbs.co/thread-"));
+    }
 
     #[tokio::test]
     #[ignore = "requires network access"]

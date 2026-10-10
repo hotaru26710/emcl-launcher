@@ -86,3 +86,13 @@ pub async fn install_modrinth_version(
         message
     })
 }
+
+#[tauri::command]
+pub async fn list_mcbbs_mods(
+    state: State<'_, AppState>,
+    query: Option<String>,
+) -> Result<Vec<crate::core::community::McbbsThread>, String> {
+    community::list_mcbbs_mods(&state.http, query.as_deref().unwrap_or_default())
+        .await
+        .map_err(|error| error.to_string())
+}

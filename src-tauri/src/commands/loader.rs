@@ -119,3 +119,14 @@ pub async fn install_loader(
 
     Ok(result)
 }
+
+#[tauri::command]
+pub async fn get_loader_versions(
+    state: State<'_, AppState>,
+    loader: LoaderType,
+    game_version: String,
+) -> Result<Vec<loader::LoaderVersionInfo>, String> {
+    loader::list_loader_versions(&state.http, &loader, &game_version)
+        .await
+        .map_err(|error| error.to_string())
+}

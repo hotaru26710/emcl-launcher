@@ -80,6 +80,7 @@ pub fn run() {
             commands::launch::stop_instance,
             commands::launch::is_instance_running,
             commands::loader::install_loader,
+            commands::loader::get_loader_versions,
             commands::mods::list_mods,
             commands::mods::install_mods,
             commands::mods::toggle_mod,
@@ -87,6 +88,7 @@ pub fn run() {
             commands::community::search_modrinth_mods,
             commands::community::get_modrinth_versions,
             commands::community::install_modrinth_version,
+            commands::community::list_mcbbs_mods,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EMCL");

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/tauri";
-import type { Instance, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
+import type { Instance, McbbsThread, ModrinthSearchResult, ModrinthVersionInfo } from "../api/types";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
 import { formatDate } from "../lib/format";
@@ -25,8 +25,11 @@ export function CommunityMods() {
   const [instance, setInstance] = useState<Instance | null>(
     instances.find((item) => item.id === id) ?? null,
   );
+  const [source, setSource] = useState<"modrinth" | "mcbbs">("modrinth");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ModrinthSearchResult[]>([]);
+  const [mcbbsThreads, setMcbbsThreads] = useState<McbbsThread[]>([]);
+  const [mcbbsLoading, setMcbbsLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ModrinthSearchResult | null>(null);
   const [versions, setVersions] = useState<ModrinthVersionInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,6 +64,30 @@ export function CommunityMods() {
       setMessage(String(error));
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!instance) return;
+    if (source === "modrinth") {
+      void search();
+    } else {
+      void searchMcbbs();
+    }
+    // Intentionally reload when the source or instance changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance?.id, source]);
+
+  const searchMcbbs = async () => {
+    setMcbbsLoading(true);
+    setMessage("");
+    try {
+      const threads = await api.listMcbbsMods(query);
+      setMcbbsThreads(threads);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setMcbbsLoading(false);
     }
   };
 
@@ -120,6 +147,29 @@ export function CommunityMods() {
       />
 
       <div className="glass-panel rounded-[30px] p-5">
+        <div className="mb-4 flex rounded-xl border border-white/8 bg-slate-950/40 p-1">
+          <button
+            type="button"
+            onClick={() => setSource("modrinth")}
+            className={[
+              "rounded-lg px-3 py-2 text-xs transition",
+              source === "modrinth" ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500 hover:text-slate-200",
+            ].join(" ")}
+          >
+            热门 Modrinth
+          </button>
+          <button
+            type="button"
+            onClick={() => setSource("mcbbs")}
+            className={[
+              "rounded-lg px-3 py-2 text-xs transition",
+              source === "mcbbs" ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500 hover:text-slate-200",
+            ].join(" ")}
+          >
+            MCBBS 资源帖
+          </button>
+        </div>
+
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-64 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
@@ -136,19 +186,54 @@ export function CommunityMods() {
           <button
             type="button"
             disabled={loading}
-            onClick={() => void search()}
+            onClick={() => void (source === "modrinth" ? search() : searchMcbbs())}
             className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-40"
           >
             <Search size={16} />
-            {loading ? "搜索中..." : "搜索"}
+            {loading || mcbbsLoading ? "加载中..." : "搜索 / 刷新"}
           </button>
         </div>
         <p className="mt-3 text-xs text-slate-600">
-          仅展示与 Minecraft {instance.versionId}{instance.loader ? ` 和 ${instance.loader}` : ""} 兼容的模组；安装会自动处理必需依赖。
+          {source === "modrinth"
+            ? `默认陈列与 Minecraft ${instance.versionId}${instance.loader ? ` 和 ${instance.loader}` : ""} 兼容的热门模组；搜索只用于缩小范围。`
+            : "陈列 MCBBS 纪念版 Mod 版块的资源帖子；打开帖子后在论坛内查看下载说明。"}
         </p>
         {message ? <p className="mt-3 text-xs leading-5 text-cyan-200">{message}</p> : null}
       </div>
 
+      {source === "mcbbs" ? (
+        <section className="glass-panel mt-5 rounded-[28px] p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <Box size={16} />
+            MCBBS 资源帖
+            <StatusPill tone="slate">{`${mcbbsThreads.length} 条`}</StatusPill>
+          </div>
+          <div className="mt-4 grid max-h-[62vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+            {mcbbsLoading ? (
+              <div className="col-span-full py-10 text-center text-sm text-slate-500">正在读取 MCBBS 版块...</div>
+            ) : mcbbsThreads.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-600">
+                暂无可显示的 MCBBS 资源帖。
+              </div>
+            ) : (
+              mcbbsThreads.map((thread) => (
+                <a
+                  key={thread.url}
+                  href={thread.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl border border-white/8 bg-slate-950/30 p-4 transition hover:-translate-y-0.5 hover:border-cyan-300/20 hover:bg-cyan-300/[0.035]"
+                >
+                  <div className="line-clamp-2 text-sm font-medium leading-6 text-slate-100">{thread.title}</div>
+                  <div className="mt-3 inline-flex items-center gap-1 text-xs text-cyan-300">
+                    打开 MCBBS 帖子 <ExternalLink size={12} />
+                  </div>
+                </a>
+              ))
+            )}
+          </div>
+        </section>
+      ) : (
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
         <section className="glass-panel rounded-[28px] p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
@@ -265,6 +350,7 @@ export function CommunityMods() {
           )}
         </section>
       </div>
+      )}
     </div>
   );
 }

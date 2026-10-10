@@ -8,7 +8,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import type { LoaderType } from "../api/types";
+import { api } from "../api/tauri";
+import type { LoaderType, LoaderVersionInfo } from "../api/types";
 import { LoaderIcon, loaderLabel } from "../components/LoaderIcon";
 import { PageHeader } from "../components/PageHeader";
 import { StatusPill } from "../components/StatusPill";
@@ -32,6 +33,8 @@ export function CreateInstance() {
   const [versionId, setVersionId] = useState("1.21.1");
   const [loader, setLoader] = useState<PrimaryLoader>("vanilla");
   const [loaderVersion, setLoaderVersion] = useState("");
+  const [loaderVersions, setLoaderVersions] = useState<LoaderVersionInfo[]>([]);
+  const [loaderVersionsLoading, setLoaderVersionsLoading] = useState(false);
   const [optifine, setOptifine] = useState(false);
   const [name, setName] = useState("");
   const [memoryMb, setMemoryMb] = useState(settings?.defaultMemoryMb ?? 4096);
@@ -59,6 +62,29 @@ export function CreateInstance() {
   useEffect(() => {
     if (!optifineCompatible) setOptifine(false);
   }, [optifineCompatible]);
+
+  useEffect(() => {
+    if (step !== 2 || loader === "vanilla") {
+      setLoaderVersions([]);
+      return;
+    }
+    let disposed = false;
+    setLoaderVersionsLoading(true);
+    void api
+      .getLoaderVersions(loader, versionId)
+      .then((versions) => {
+        if (!disposed) setLoaderVersions(versions);
+      })
+      .catch(() => {
+        if (!disposed) setLoaderVersions([]);
+      })
+      .finally(() => {
+        if (!disposed) setLoaderVersionsLoading(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [step, loader, versionId]);
 
   const chooseLoader = (choice: PrimaryLoader) => {
     setLoader(choice);
@@ -246,12 +272,22 @@ export function CreateInstance() {
           {loader !== "vanilla" ? (
             <label className="mt-5 block max-w-md">
               <span className="text-xs font-medium text-slate-400">加载器版本</span>
-              <input
+              <select
                 value={loaderVersion}
+                disabled={loaderVersionsLoading}
                 onChange={(event) => setLoaderVersion(event.currentTarget.value)}
-                placeholder="留空自动选择最新稳定版"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
-              />
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/55 px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-300/40 disabled:opacity-50"
+              >
+                <option value="">自动选择最新稳定版</option>
+                {loaderVersions.map((version) => (
+                  <option key={version.version} value={version.version}>
+                    {version.version}{version.stable ? " · 稳定" : ""}
+                  </option>
+                ))}
+              </select>
+              {loaderVersionsLoading ? (
+                <span className="mt-2 block text-[11px] text-slate-600">正在读取加载器版本...</span>
+              ) : null}
             </label>
           ) : null}
 

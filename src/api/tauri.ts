@@ -9,6 +9,8 @@ import type {
   InstallSummary,
   InstallVersionInput,
   LoaderInstallResult,
+  LoaderVersionInfo,
+  McbbsThread,
   ModInfo,
   InstallModrinthInput,
   ModrinthSearchResult,
@@ -66,6 +68,8 @@ export const api = {
     invoke<InstallSummary>("install_version", { input }),
   installLoader: (input: InstallLoaderInput) =>
     invoke<LoaderInstallResult>("install_loader", { input }),
+  getLoaderVersions: (loader: string, gameVersion: string) =>
+    invoke<LoaderVersionInfo[]>("get_loader_versions", { loader, gameVersion }),
   listMods: (instanceId: string) => invoke<ModInfo[]>("list_mods", { instanceId }),
   installMods: (instanceId: string, paths: string[]) =>
     invoke<ModInfo[]>("install_mods", { instanceId, paths }),
@@ -79,6 +83,8 @@ export const api = {
     invoke<ModrinthVersionInfo[]>("get_modrinth_versions", { projectId, gameVersion, loader }),
   installModrinthVersion: (input: InstallModrinthInput) =>
     invoke<ModInfo[]>("install_modrinth_version", { input }),
+  listMcbbsMods: (query?: string) =>
+    invoke<McbbsThread[]>("list_mcbbs_mods", { query }),
   launchInstance: (instanceId: string) =>
     invoke<LaunchResult>("launch_instance", { instanceId }),
   stopInstance: (instanceId: string) => invoke<void>("stop_instance", { instanceId }),
